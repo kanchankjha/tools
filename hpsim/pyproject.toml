@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Multi-client traffic generator inspired by hping3"
 readme = "README.md"
 requires-python = ">=3.8"
-authors = [{ name = "Automation", email = "devnull@example.com" }]
+authors = [{ name = "Kanchan Kumar Jha", email = "kanchankjha@gmail.com" }]
 dependencies = [
     "scapy>=2.5",
     "psutil>=5.9",
