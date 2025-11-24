@@ -1,0 +1,2 @@
+[console_scripts]
+fluxprobe = fluxprobe.cli:main

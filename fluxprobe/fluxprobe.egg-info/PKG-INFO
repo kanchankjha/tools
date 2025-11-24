@@ -1,3 +1,12 @@
+Metadata-Version: 2.4
+Name: fluxprobe
+Version: 0.1.0
+Summary: Schema-driven protocol fuzzer
+Author-email: Kanchan Kumar Jha <kanchankjha@gmail.com>
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: PyYAML>=6.0
+
 # FluxProbe
 
 FluxProbe is a lightweight, schema-driven protocol fuzzer. Point it at a protocol description, and it will emit a mix of valid and intentionally corrupted frames, send them to your device-under-test (DUT), and log what happens. The goal is to reproduce the fast iteration of commercial fuzzers (e.g., Codenomicon) with an open, hackable core.
