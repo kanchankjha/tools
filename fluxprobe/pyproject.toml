@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Schema-driven protocol fuzzer"
 readme = "README.md"
 requires-python = ">=3.9"
+authors = [{ name = "Kanchan Kumar Jha", email = "kanchankjha@gmail.com" }]
 dependencies = ["PyYAML>=6.0"]
 
 [project.scripts]

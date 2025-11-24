@@ -2,11 +2,185 @@
 
 FluxProbe is a lightweight, schema-driven protocol fuzzer. Point it at a protocol description, and it will emit a mix of valid and intentionally corrupted frames, send them to your device-under-test (DUT), and log what happens. The goal is to reproduce the fast iteration of commercial fuzzers (e.g., Codenomicon) with an open, hackable core.
 
+## Installation
+
+### Prerequisites
+- **Python 3.9+** (tested with Python 3.12)
+- **Git** for cloning the repository
+- **pip** for installing dependencies
+
+### Step 1: Clone the Repository
+
+```bash
+# Clone the repository
+git clone https://github.com/kanchankjha/tools.git
+
+# Navigate to the fluxprobe directory
+cd tools/fluxprobe
+```
+
+### Step 2: Install Dependencies
+
+FluxProbe has minimal dependencies - only PyYAML for YAML schema support.
+
+```bash
+# Install required dependencies
+pip install -r requirements.txt
+
+# Or install PyYAML directly
+pip install "PyYAML>=6.0"
+```
+
+### Step 3: Install FluxProbe (Optional)
+
+You can either run FluxProbe as a module or install it as a package:
+
+#### Option A: Run as Module (No Installation)
+```bash
+# Run directly from the repository
+python3 -m fluxprobe --help
+```
+
+#### Option B: Install as Package
+```bash
+# Install in development mode (editable)
+pip install -e .
+
+# Now you can run from anywhere
+fluxprobe --help
+```
+
+#### Option C: Install from Source
+```bash
+# Build and install
+pip install .
+
+# Run the installed command
+fluxprobe --help
+```
+
+### Verify Installation
+
+```bash
+# Test with a built-in profile
+python3 -m fluxprobe --protocol echo --target 127.0.0.1:9000 --iterations 5
+
+# Or if installed as package:
+fluxprobe --protocol echo --target 127.0.0.1:9000 --iterations 5
+```
+
+### For Developers
+
+If you plan to modify or contribute to FluxProbe:
+
+```bash
+# Clone the repository
+git clone https://github.com/kanchankjha/tools.git
+cd tools/fluxprobe
+
+# Install with development dependencies
+pip install -e .
+
+# Install testing tools
+pip install pytest pytest-cov pytest-mock
+
+# Run tests to verify setup
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=fluxprobe --cov-report=html
+```
+
 ## Features
 - Declarative protocol schemas (YAML/JSON) with primitive field types, enums, and length references.
 - Valid frame generator plus structure-aware and byte-level mutators (off-by-one lengths, invalid enums, bit flips, trunc/extend, checksum tamper hooks).
 - Pluggable transports (TCP/UDP) and a simple run loop with rate limiting and timeouts.
 - Deterministic runs via `--seed`, with hexdump logging for replay.
+
+## Quick Start Guide
+
+### 1. Basic Usage with Built-in Profiles
+
+FluxProbe comes with 11 built-in protocol profiles that work out of the box:
+
+```bash
+# Fuzz an HTTP server
+python3 -m fluxprobe --protocol http --target 192.168.1.100:80 --iterations 200 --mutation-rate 0.4
+
+# Fuzz a DNS server
+python3 -m fluxprobe --protocol dns --target 8.8.8.8:53 --iterations 100
+
+# Fuzz an MQTT broker
+python3 -m fluxprobe --protocol mqtt --target localhost:1883 --iterations 500 --seed 42
+
+# Fuzz Modbus/TCP device
+python3 -m fluxprobe --protocol modbus --target 10.0.0.5:502 --iterations 300 --mutation-rate 0.5
+```
+
+**Available built-in profiles:** `echo`, `http`, `dns`, `mqtt`, `modbus`, `coap`, `tcp`, `udp`, `ip`, `snmp`, `ssh`
+
+### 2. Using Custom Schema Files
+
+Create your own protocol definition or use provided examples:
+
+```bash
+# Use an example schema
+python3 -m fluxprobe --schema examples/protocols/echo.yaml --host 127.0.0.1 --port 9000 --iterations 200
+
+# Override schema settings
+python3 -m fluxprobe --schema examples/protocols/http_request.yaml --target 192.168.1.10:8080 --mutation-rate 0.3
+
+# Save logs for later analysis
+python3 -m fluxprobe --schema my_protocol.yaml --target device.local:5000 --log-file output/fuzz.log --iterations 1000
+```
+
+### 3. Advanced Options
+
+```bash
+# Reproducible fuzzing with seed
+python3 -m fluxprobe --protocol http --target localhost:80 --seed 12345 --iterations 100
+
+# High mutation rate for aggressive testing
+python3 -m fluxprobe --protocol mqtt --target broker:1883 --mutation-rate 0.9 --mutations-per-frame 3
+
+# Slow down fuzzing with delays
+python3 -m fluxprobe --protocol modbus --target plc:502 --delay-ms 100 --iterations 500
+
+# Wait for and log responses
+python3 -m fluxprobe --protocol echo --target echo-server:7 --recv-timeout 2.0 --log-file responses.log
+
+# Adjust logging verbosity
+python3 -m fluxprobe --protocol http --target webapp:80 --log-level DEBUG --iterations 50
+```
+
+### 4. Common Use Cases
+
+#### Test a Web Server
+```bash
+python3 -m fluxprobe --protocol http --target myapp.local:8080 \
+    --iterations 1000 \
+    --mutation-rate 0.4 \
+    --log-file logs/webapp-fuzz.log \
+    --seed 42
+```
+
+#### Test an IoT Device
+```bash
+python3 -m fluxprobe --protocol mqtt --target iot-device:1883 \
+    --iterations 500 \
+    --mutation-rate 0.3 \
+    --recv-timeout 1.0 \
+    --delay-ms 50
+```
+
+#### Test Industrial Control System
+```bash
+python3 -m fluxprobe --protocol modbus --target plc.factory:502 \
+    --iterations 200 \
+    --mutation-rate 0.2 \
+    --mutations-per-frame 1 \
+    --log-file logs/plc-test.log
+```
 
 ## Quickstart
 - Built-in profiles (no YAML needed): `python -m fluxprobe --protocol http --target 10.0.0.5:8080 --iterations 200 --mutation-rate 0.4`
@@ -44,6 +218,59 @@ Supported field types:
 - `length_of` lets one field mirror the length of another field.
 - `min_value` / `max_value` for numeric bounds, `min_length` / `max_length` for blobs.
 
+## CLI Reference
+
+### Basic Options
+- `--protocol <name>`: Use a built-in profile (`echo`, `http`, `dns`, `mqtt`, `modbus`, `coap`, `tcp`, `udp`, `ip`, `snmp`, `ssh`)
+- `--schema <path>`: Path to custom YAML/JSON schema file (alternative to `--protocol`)
+- `--target <host:port>`: Target address (shorthand for `--host` and `--port`)
+- `--host <hostname>`: Target hostname or IP address
+- `--port <number>`: Target port (1-65535)
+
+### Fuzzing Behavior
+- `--iterations <number>`: Number of frames to send (default: 100)
+- `--mutation-rate <float>`: Probability to mutate each frame, range 0.0-1.0 (default: 0.3)
+  - `0.0` = only send valid frames
+  - `1.0` = always mutate frames
+- `--mutations-per-frame <number>`: How many mutation operations per frame (default: 1)
+
+### Timing & Network
+- `--recv-timeout <seconds>`: Seconds to wait for responses (default: 0.0 = no wait)
+- `--delay-ms <milliseconds>`: Delay between sends in milliseconds (default: 0)
+
+### Reproducibility & Logging
+- `--seed <number>`: RNG seed for reproducible fuzzing runs
+- `--log-file <path>`: Save detailed logs with hexdumps and metadata
+- `--log-level <level>`: Logging verbosity: `DEBUG`, `INFO` (default), `WARNING`, `ERROR`
+
+### Examples
+
+```bash
+# Minimal usage - fuzz localhost echo server
+python3 -m fluxprobe --protocol echo --target localhost:9000 --iterations 50
+
+# Full options - production fuzzing with logging
+python3 -m fluxprobe \
+    --protocol http \
+    --target webserver.example.com:80 \
+    --iterations 10000 \
+    --mutation-rate 0.5 \
+    --mutations-per-frame 2 \
+    --recv-timeout 5.0 \
+    --delay-ms 10 \
+    --seed 999 \
+    --log-file logs/production-fuzz.log \
+    --log-level INFO
+
+# Custom schema with overrides
+python3 -m fluxprobe \
+    --schema my_custom_protocol.yaml \
+    --host 10.0.0.50 \
+    --port 5555 \
+    --iterations 500 \
+    --mutation-rate 0.8
+```
+
 ## CLI
 - `--protocol`: use a built-in profile (see list above)
 - `--schema`: path to YAML/JSON schema (if not using `--protocol`)
@@ -57,8 +284,163 @@ Supported field types:
 - `--log-file`: optional log path (hexdumps + metadata)
 
 ## Structure
+- `fluxprobe/` — Core library modules
+  - `cli.py` — Command-line interface and argument parsing
+  - `schema.py` — Schema loading and validation (YAML/JSON)
+  - `generator.py` — Valid message generation from schemas
+  - `mutator.py` — Mutation strategies (bit flips, length corruption, etc.)
+  - `transport.py` — Network transports (TCP/UDP)
+  - `runner.py` — Main fuzzing loop and logging
+  - `profiles.py` — Built-in protocol definitions
+- `examples/protocols/` — Sample protocol schemas
+  - `echo.yaml` — Simple echo protocol
+  - `http_request.yaml` — HTTP GET/POST requests
+  - `dns_query.yaml` — DNS queries
+  - `mqtt_connect.yaml` — MQTT connection packets
+  - `modbus_tcp.yaml` — Modbus/TCP protocol
+  - `coap_get.yaml` — CoAP requests
+  - `snmp_get.yaml` — SNMP queries
+  - `ssh_kexinit.yaml` — SSH key exchange
+  - And more...
+- `tests/` — Comprehensive test suite (48 tests, 96% coverage)
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. "ModuleNotFoundError: No module named 'yaml'"
+```bash
+# Install PyYAML
+pip install PyYAML
+```
+
+#### 2. "Connection refused" or timeout errors
+- Verify target service is running: `telnet <host> <port>`
+- Check firewall rules and network connectivity
+- Try increasing `--recv-timeout` if expecting slow responses
+
+#### 3. "Invalid port number" error
+- Ensure port is between 1-65535
+- Check schema file for valid port configuration
+
+#### 4. "Circular dependency detected"
+- Schema has invalid `length_of` chain (field A → B → A)
+- Review schema to ensure length references don't form cycles
+
+#### 5. Python version errors
+- FluxProbe requires Python 3.9 or higher
+- Check version: `python3 --version`
+- Upgrade if needed: `sudo apt install python3.11` (or use pyenv)
+
+### Getting Help
+
+```bash
+# Show all available options
+python3 -m fluxprobe --help
+
+# Test installation with verbose output
+python3 -m fluxprobe --protocol echo --target localhost:9000 --iterations 5 --log-level DEBUG
+
+# Run test suite to verify installation
+pytest tests/ -v
+```
+
+### Example Debug Session
+
+```bash
+# Start with minimal test
+python3 -m fluxprobe --protocol echo --target localhost:7 --iterations 1 --log-level DEBUG
+
+# If successful, increase iterations
+python3 -m fluxprobe --protocol echo --target localhost:7 --iterations 10
+
+# Add mutations gradually
+python3 -m fluxprobe --protocol echo --target localhost:7 --iterations 10 --mutation-rate 0.1
+
+# Enable logging to review what was sent
+python3 -m fluxprobe --protocol echo --target localhost:7 --iterations 10 --mutation-rate 0.3 --log-file debug.log
+```
+
+## Project Structure & Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage report
+pytest tests/ --cov=fluxprobe --cov-report=html
+
+# Run specific test file
+pytest tests/test_generator_mutator.py -v
+
+# Run tests for a specific feature
+pytest tests/test_circular_dependency.py -v
+```
+
+### Test Coverage
+- **48 tests** covering all major functionality
+- **96% code coverage** across all modules
+- Tests for edge cases, error handling, and validation
+- Circular dependency detection tests
+- Mutation strategy tests
+- Schema validation tests
+
+## Structure
 - `fluxprobe/` — core library (schema loader, generator, mutators, transports, runner, CLI)
 - `examples/protocols/` — sample schemas to adapt (echo, HTTP, DNS, MQTT, Modbus/TCP, CoAP, TCP raw, UDP payload, IPv4 packet, SNMP, SSH)
+
+## Roadmap & Future Features
+- **Coverage-guided fuzzing**: Integrate with instrumentation for smarter mutation
+- **PCAP import**: Use real network captures as fuzzing seeds
+- **Checksum calculation**: Automatic CRC/checksum field computation
+- **State machines**: Multi-step protocol flows (handshake → request → response)
+- **Web dashboard**: Real-time monitoring and result visualization
+- **Corpus management**: Save interesting test cases for regression testing
+- **Crash detection**: Automatic detection of target crashes/restarts
+- **Response analysis**: Pattern matching on responses to detect anomalies
+
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+```bash
+# Fork and clone
+git clone https://github.com/YOUR_USERNAME/tools.git
+cd tools/fluxprobe
+
+# Create a branch
+git checkout -b feature/my-new-feature
+
+# Install in development mode
+pip install -e .
+pip install pytest pytest-cov pytest-mock
+
+# Make changes and test
+pytest tests/ -v
+
+# Commit and push
+git add .
+git commit -m "Add new feature"
+git push origin feature/my-new-feature
+```
+
+### Areas for Contribution
+- Additional built-in protocol profiles
+- New mutation strategies
+- Protocol-specific validators
+- Performance optimizations
+- Documentation improvements
+- Bug fixes and test coverage
+
+## License
+
+See the LICENSE file in the repository root.
+
+## Acknowledgments
+
+FluxProbe aims to provide fast fuzzing iteration similar to commercial tools like Codenomicon, but with an open, hackable architecture that's easy to extend and customize.
 
 ## Roadmap Ideas
 - Coverage-guided mode, PCAP import for seeds, checksum helpers, richer state machines, web dashboard.
