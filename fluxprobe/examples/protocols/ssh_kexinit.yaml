@@ -1,0 +1,24 @@
+name: SSH KEXINIT
+transport:
+  type: tcp
+  host: 127.0.0.1
+  port: 22
+  timeout: 1.0
+message:
+  fields:
+    - name: packet_length
+      type: u32
+      min_value: 0
+      max_value: 4096
+    - name: padding_length
+      type: u8
+      min_value: 4
+      max_value: 32
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 4000
+      fuzz_values:
+        - "SSH-2.0-FluxProbe\r\n"
+        - "\x14\x00\x00\x00\x0b"  # KEXINIT minimal noise
+        - ""

@@ -1,0 +1,20 @@
+name: TCP Raw Payload
+transport:
+  type: tcp
+  host: 127.0.0.1
+  port: 7
+  timeout: 1.0
+message:
+  fields:
+    - name: payload_length
+      type: u16
+      length_of: payload
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 256
+      fuzz_values:
+        - ""
+        - "PING"
+        - "A"*32
+        - "\x00\x00\x00\x00"

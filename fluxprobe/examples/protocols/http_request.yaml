@@ -1,0 +1,41 @@
+name: HTTP Request
+transport:
+  type: tcp
+  host: 127.0.0.1
+  port: 80
+  timeout: 1.0
+message:
+  fields:
+    - name: method
+      type: string
+      choices: ["GET", "POST", "PUT", "DELETE", "HEAD"]
+    - name: space1
+      type: string
+      default: " "
+    - name: path
+      type: string
+      min_length: 1
+      max_length: 40
+      fuzz_values: ["/", "/index.html", "/../../etc/passwd", "/%00", "/very/long/path/component"]
+    - name: space2
+      type: string
+      default: " "
+    - name: version
+      type: string
+      choices: ["HTTP/1.1", "HTTP/1.0"]
+      default: "HTTP/1.1"
+    - name: crlf
+      type: string
+      default: "\r\n"
+    - name: headers
+      type: string
+      min_length: 0
+      max_length: 200
+      fuzz_values:
+        - "Host: example.com\r\nUser-Agent: FluxProbe\r\n"
+        - "Host:\r\n"
+        - "Host: example.com\r\nContent-Length: 0\r\nX-Test: A\r\n"
+        - ""
+    - name: end
+      type: string
+      default: "\r\n"

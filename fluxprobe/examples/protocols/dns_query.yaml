@@ -1,0 +1,41 @@
+name: DNS Query
+transport:
+  type: udp
+  host: 8.8.8.8
+  port: 53
+  timeout: 1.0
+message:
+  fields:
+    - name: transaction_id
+      type: u16
+    - name: flags
+      type: u16
+      default: 0x0100   # recursion desired
+    - name: qdcount
+      type: u16
+      default: 1
+    - name: ancount
+      type: u16
+      default: 0
+    - name: nscount
+      type: u16
+      default: 0
+    - name: arcount
+      type: u16
+      default: 0
+    - name: qname
+      type: bytes
+      min_length: 4
+      max_length: 40
+      fuzz_values:
+        - "\x03www\x07example\x03com\x00"
+        - "\x01a\x01b\x01c\x00"
+        - "\x00"
+    - name: qtype
+      type: u16
+      choices: [1, 2, 5, 15, 16, 28, 252]
+      default: 1
+    - name: qclass
+      type: u16
+      choices: [1, 3, 4, 254, 255]
+      default: 1

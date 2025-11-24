@@ -1,0 +1,49 @@
+name: IPv4 Packet
+transport:
+  type: udp
+  host: 127.0.0.1
+  port: 0
+  timeout: 1.0
+message:
+  fields:
+    - name: version_ihl
+      type: u8
+      default: 0x45   # v4, IHL=5
+    - name: dscp_ecn
+      type: u8
+      default: 0x00
+    - name: total_length
+      type: u16
+      min_value: 20
+      max_value: 1500
+    - name: identification
+      type: u16
+    - name: flags_fragment
+      type: u16
+      default: 0x4000
+    - name: ttl
+      type: u8
+      default: 64
+    - name: protocol
+      type: u8
+      choices: [1, 6, 17, 41]
+      default: 6
+    - name: header_checksum
+      type: u16
+      fuzz_values: [0x0000, 0xFFFF]
+      default: 0
+    - name: src_ip
+      type: bytes
+      length: 4
+      fuzz_values: ["\x7F\x00\x00\x01", "\xC0\xA8\x01\x01"]
+      default: "\x7F\x00\x00\x01"
+    - name: dst_ip
+      type: bytes
+      length: 4
+      fuzz_values: ["\x7F\x00\x00\x01", "\x08\x08\x08\x08"]
+      default: "\x7F\x00\x00\x01"
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 1480
+      fuzz_values: ["", "DATA", "\xFF"*16]

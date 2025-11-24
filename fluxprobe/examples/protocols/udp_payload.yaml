@@ -1,0 +1,20 @@
+name: UDP Payload
+transport:
+  type: udp
+  host: 127.0.0.1
+  port: 9999
+  timeout: 1.0
+message:
+  fields:
+    - name: payload_length
+      type: u16
+      length_of: payload
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 256
+      fuzz_values:
+        - ""
+        - "HELLO"
+        - "\xFF"*8
+        - "B"*64

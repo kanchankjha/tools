@@ -1,0 +1,31 @@
+name: Modbus TCP
+transport:
+  type: tcp
+  host: 127.0.0.1
+  port: 502
+  timeout: 1.0
+message:
+  fields:
+    - name: transaction_id
+      type: u16
+    - name: protocol_id
+      type: u16
+      default: 0
+    - name: length
+      type: u16
+      length_of: payload
+    - name: unit_id
+      type: u8
+      default: 1
+    - name: function_code
+      type: enum
+      choices: [1, 2, 3, 4, 5, 6, 15, 16]
+      default: 3
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 252
+      fuzz_values:
+        - "\x00\x6B\x00\x03"        # read holding registers start=107 qty=3
+        - "\x00\x00\x00\x10"        # read coils
+        - ""

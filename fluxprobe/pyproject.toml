@@ -1,0 +1,10 @@
+[project]
+name = "fluxprobe"
+version = "0.1.0"
+description = "Schema-driven protocol fuzzer"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+fluxprobe = "fluxprobe.cli:main"

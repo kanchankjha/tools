@@ -1,0 +1,35 @@
+name: CoAP GET
+transport:
+  type: udp
+  host: 127.0.0.1
+  port: 5683
+  timeout: 1.0
+message:
+  fields:
+    - name: ver_t_tkl
+      type: u8
+      default: 0x40   # ver=1, type=0, tkl=0
+    - name: code
+      type: enum
+      choices: [1, 2, 3, 132]   # GET, POST, PUT, 4.04
+      default: 1
+    - name: message_id
+      type: u16
+    - name: token
+      type: bytes
+      min_length: 0
+      max_length: 8
+      fuzz_values: ["", "\x01", "\xAA\xBB\xCC\xDD"]
+    - name: options
+      type: bytes
+      min_length: 0
+      max_length: 24
+      fuzz_values:
+        - "\xb6\x76\x65\x72\x73"   # Uri-Path "vers"
+        - "\xb2id"
+        - ""
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 32
+      fuzz_values: ["", "test", "verylongpayloaddata"]

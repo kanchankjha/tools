@@ -1,0 +1,39 @@
+name: MQTT Connect
+transport:
+  type: tcp
+  host: 127.0.0.1
+  port: 1883
+  timeout: 1.0
+message:
+  fields:
+    - name: packet_type
+      type: u8
+      default: 0x10   # CONNECT
+    - name: remaining_length
+      type: u16
+      length_of: payload
+    - name: protocol_name
+      type: string
+      default: "MQTT"
+    - name: protocol_level
+      type: u8
+      default: 4
+    - name: connect_flags
+      type: u8
+      default: 0x02   # clean session
+    - name: keep_alive
+      type: u16
+      default: 60
+    - name: client_id_length
+      type: u16
+      length_of: client_id
+    - name: client_id
+      type: string
+      min_length: 0
+      max_length: 24
+      fuzz_values: ["client-1", "", "A"*23, "null\x00id"]
+    - name: payload
+      type: bytes
+      min_length: 0
+      max_length: 32
+      fuzz_values: ["", "test", "username\x00password"]
