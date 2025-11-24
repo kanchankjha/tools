@@ -36,6 +36,19 @@ def generate_identities(
 
 
 def _mac_seed(base_mac: Optional[str]) -> List[int]:
+    """
+    Generate a MAC address seed for creating sequential addresses.
+
+    If base_mac is provided, use it as the seed. Otherwise, generate
+    a locally administered MAC with prefix 02:00:00 (the 0x02 prefix
+    indicates a locally administered address, not globally unique).
+
+    Args:
+        base_mac: Optional MAC address string in format "xx:xx:xx:xx:xx:xx"
+
+    Returns:
+        List of 6 integers representing MAC bytes
+    """
     if base_mac:
         try:
             parts = [int(part, 16) for part in base_mac.split(":")]
@@ -46,10 +59,21 @@ def _mac_seed(base_mac: Optional[str]) -> List[int]:
             raise ValueError(f"Invalid MAC address: {base_mac}") from exc
 
     # Locally administered prefix 02:00:00 with random tail
+    # The 0x02 bit indicates this is not a globally unique MAC
     return [0x02, 0x00, 0x00, random.randint(0, 255), random.randint(0, 255), 0x00]
 
 
 def _mac_from_seed(seed: List[int], index: int) -> str:
+    """
+    Generate a MAC address by incrementing the seed by index.
+
+    Args:
+        seed: Base MAC address as list of 6 bytes
+        index: Offset to add to base MAC (0-based)
+
+    Returns:
+        MAC address string in format "xx:xx:xx:xx:xx:xx"
+    """
     mac_bytes = seed[:]
     mac_int = 0
     for byte in mac_bytes:

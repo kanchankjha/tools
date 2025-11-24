@@ -1,3 +1,20 @@
+Metadata-Version: 2.4
+Name: hpsim
+Version: 0.1.0
+Summary: Multi-client traffic generator inspired by hping3
+Author-email: Kanchan Kumar Jha <kanchankjha@gmail.com>
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: scapy>=2.5
+Requires-Dist: psutil>=5.9
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: pytest-mock>=3.10; extra == "dev"
+Provides-Extra: extras
+Requires-Dist: netifaces>=0.11; extra == "extras"
+
 # hpsim (hping3-inspired simulator)
 
 Python package that simulates many clients on one Linux host, sending hping3-style traffic with spoofed IP/MAC addresses from the same subnet.

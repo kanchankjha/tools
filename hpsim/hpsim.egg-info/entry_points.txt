@@ -1,0 +1,2 @@
+[console_scripts]
+hpsim = hpsim.cli:main

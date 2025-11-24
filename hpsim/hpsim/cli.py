@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from .config import build_runtime_config, load_config_file, merge_config
 from .sender import Simulator
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
     file_cfg: Dict[str, Any] = {}
     if args.config:
@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+def _parse_args(argv: Optional[List[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="hpsim",
         description="Simulate multiple clients sending hping3-like traffic",
@@ -39,9 +39,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--dest-subnet", help="CIDR to randomize destination addresses")
     parser.add_argument("--clients", type=int, default=None, help="Number of simulated clients")
     parser.add_argument("--subnet-pool", help="CIDR pool for client IPs (defaults to interface subnet)")
-    parser.add_argument("--dport", type=int, help="Destination port for TCP/UDP")
-    parser.add_argument("--sport", type=int, help="Source port for TCP/UDP")
-    parser.add_argument("--proto", choices=["tcp", "udp", "icmp"], default=None, help="Protocol to send")
+    parser.add_argument("--dport", type=int, help="Destination port for TCP/UDP/SCTP")
+    parser.add_argument("--sport", type=int, help="Source port for TCP/UDP/SCTP")
+    parser.add_argument("--proto", choices=["tcp", "udp", "icmp", "igmp", "gre", "esp", "ah", "sctp"], default=None, help="Protocol to send")
     parser.add_argument("--flags", default=None, help="TCP flags string (hping3 style)")
     parser.add_argument("--interval", type=float, default=None, help="Interval between sends in seconds")
     parser.add_argument("--count", type=int, default=None, help="Packets per client (0 for infinite)")
@@ -60,6 +60,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--pcap-out", help="Optional path to write sent packets to a pcap file")
     parser.add_argument("--dry-run", action="store_true", default=None, help="Build packets but do not send")
     parser.add_argument("--verbose", action="store_true", default=None, help="Verbose errors")
+    parser.add_argument("--quiet", action="store_true", default=None, help="Suppress periodic stats output")
 
     parsed = parser.parse_args(argv)
     return parsed
