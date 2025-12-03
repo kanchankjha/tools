@@ -160,3 +160,24 @@ def test_cli_target_ipv6(monkeypatch):
     monkeypatch.setattr(sys, "argv", argv)
     cli.main()
     assert captured == {"host": "::1", "port": 443}
+
+
+def test_cli_target_ipv6_invalid_no_bracket_close(monkeypatch):
+    argv = ["prog", "--protocol", "echo", "--target", "[::1"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        cli.main()
+
+
+def test_cli_target_ipv6_invalid_no_colon_after_bracket(monkeypatch):
+    argv = ["prog", "--protocol", "echo", "--target", "[::1]443"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        cli.main()
+
+
+def test_cli_target_non_integer_port(monkeypatch):
+    argv = ["prog", "--protocol", "echo", "--target", "localhost:abc"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        cli.main()

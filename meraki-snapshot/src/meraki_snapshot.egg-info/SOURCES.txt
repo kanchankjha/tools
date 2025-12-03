@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/meraki_snapshot/__init__.py
+src/meraki_snapshot/backup.py
+src/meraki_snapshot/cli.py
+src/meraki_snapshot/client.py
+src/meraki_snapshot/restore.py
+src/meraki_snapshot/storage.py
+src/meraki_snapshot.egg-info/PKG-INFO
+src/meraki_snapshot.egg-info/SOURCES.txt
+src/meraki_snapshot.egg-info/dependency_links.txt
+src/meraki_snapshot.egg-info/entry_points.txt
+src/meraki_snapshot.egg-info/requires.txt
+src/meraki_snapshot.egg-info/top_level.txt
+tests/test_backup_and_restore.py

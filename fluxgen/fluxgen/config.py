@@ -24,6 +24,7 @@ class RuntimeConfig:
     interval: float = 0.1
     count: int = 1
     payload: Optional[str] = None
+    payload_size: Optional[int] = None
     payload_hex: bool = False
     flood: bool = False
     rand_source: bool = False
@@ -94,6 +95,11 @@ def build_runtime_config(data: Dict[str, Any]) -> RuntimeConfig:
     if sport is not None and not (0 <= sport <= 65535):
         raise ValueError(f"Invalid source port: {sport} (must be 0-65535)")
 
+    # Validate payload size
+    payload_size = _maybe_int(data.get("payload_size"))
+    if payload_size is not None and payload_size < 0:
+        raise ValueError("payload_size must be >= 0 when provided")
+
     # Validate TCP flags
     flags = str(data.get("flags", "S") or "S")
     if not _validate_tcp_flags(flags):
@@ -126,6 +132,7 @@ def build_runtime_config(data: Dict[str, Any]) -> RuntimeConfig:
         interval=_as_float(data.get("interval"), default=0.1),
         count=_as_int(data.get("count"), default=1),
         payload=data.get("payload"),
+        payload_size=payload_size,
         payload_hex=bool(data.get("payload_hex", False)),
         flood=bool(data.get("flood", False)),
         rand_source=bool(data.get("rand_source", False)),
@@ -168,6 +175,7 @@ def _known_keys() -> set:
         "interval",
         "count",
         "payload",
+        "payload_size",
         "payload_hex",
         "flood",
         "rand_source",

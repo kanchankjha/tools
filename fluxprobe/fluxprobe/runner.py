@@ -26,6 +26,7 @@ class FuzzConfig:
     iterations: int = 100
     mutation_rate: float = 0.3
     mutations_per_frame: int = 1
+    payload_size: Optional[int] = None
     recv_timeout: float = 0.0
     seed: Optional[int] = None
     delay_ms: int = 0
@@ -38,6 +39,8 @@ class FuzzRunner:
         self.config = config
         self.rng = random.Random(config.seed)
         self.mutator = Mutator(schema)
+        if config.payload_size is not None and config.payload_size < 0:
+            raise ValueError("payload_size must be >= 0")
         self._log_fp = None
         if config.log_file:
             config.log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -56,7 +59,11 @@ class FuzzRunner:
                        f"mutation_rate={self.config.mutation_rate}, seed={self.config.seed}")
         try:
             for idx in range(1, self.config.iterations + 1):
-                msg = generate_valid_message(self.schema, self.rng)
+                msg = generate_valid_message(
+                    self.schema,
+                    self.rng,
+                    payload_size=self.config.payload_size,
+                )
                 payload = msg.data
                 mutated = False
                 if self.rng.random() < self.config.mutation_rate:

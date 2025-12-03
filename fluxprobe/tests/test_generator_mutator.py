@@ -108,6 +108,32 @@ def test_generate_field_value_invalid_type_raises():
 
 
 def test_width_bytes_helper():
+    from fluxprobe.schema import FieldSpec
+
+    u8_field = FieldSpec(name="f", type="u8")
+    assert _width_bytes(u8_field) == 1
+    u16_field = FieldSpec(name="f", type="u16")
+    assert _width_bytes(u16_field) == 2
+    u32_field = FieldSpec(name="f", type="u32")
+    assert _width_bytes(u32_field) == 4
+    enum_field = FieldSpec(name="f", type="enum", choices=[1, 2, 3])
+    assert _width_bytes(enum_field) == 1
+    enum_field_u16 = FieldSpec(name="f", type="enum", choices=[256, 512])
+    assert _width_bytes(enum_field_u16) == 2
+    enum_field_u32 = FieldSpec(name="f", type="enum", choices=[0x10000, 0x20000])
+    assert _width_bytes(enum_field_u32) == 4
+    enum_field_with_length = FieldSpec(name="f", type="enum", length=2)
+    assert _width_bytes(enum_field_with_length) == 2
+    unknown_field = FieldSpec(name="f", type="unknown")
+    assert _width_bytes(unknown_field) == 4
+
+
+def test_ensure_bytes_handles_invalid_type():
+    from fluxprobe.schema import FieldSpec
+
+    field = FieldSpec(name="f", type="u8")
+    with pytest.raises(ValueError):
+        _ensure_bytes([1, 2, 3], field)
     schema = build_simple_schema()
     fields = schema.message.fields
     assert _width_bytes(fields[0]) == 1
@@ -228,6 +254,51 @@ def test_mutator_short_buffers_and_missing_spans():
     m_enum = Mutator(enum_schema)
     msg_missing_span = GeneratedMessage(data=b"\x01", values={}, field_spans={})
     m_enum._invalid_enum(bytearray(msg_missing_span.data), msg_missing_span, random.Random(0))
+
+
+def test_default_payload_for_field_error():
+    from fluxprobe.generator import _default_payload_for_field
+    from fluxprobe.schema import FieldSpec
+
+    field = FieldSpec(name="test", type="bytes")
+    with pytest.raises(ValueError):
+        _default_payload_for_field(field, -1, 0x41)
+
+
+def test_generate_field_value_with_string_enum():
+    schema = protocol_from_dict(
+        {
+            "transport": {"type": "tcp", "host": "x", "port": 1},
+            "message": {"fields": [{"name": "cmd", "type": "enum", "choices": ["GET", "POST", "PUT"]}]},
+        }
+    )
+    field = schema.message.fields[0]
+    val = _generate_field_value(field, random.Random(0))
+    assert val in ["GET", "POST", "PUT"]
+
+
+def test_mutator_corrupt_length_handles_missing_target():
+    # Test that corrupt_length handles cases where the target field span doesn't exist in the message
+    schema = protocol_from_dict(
+        {
+            "name": "LengthTest",
+            "transport": {"type": "tcp", "host": "x", "port": 1},
+            "message": {
+                "fields": [
+                    {"name": "len", "type": "u16", "length_of": "data"},
+                    {"name": "data", "type": "bytes", "min_length": 1, "max_length": 10},
+                ]
+            },
+        }
+    )
+    # Create a message but remove the target field span to simulate missing reference
+    msg = generate_valid_message(schema, random.Random(0))
+    # Create a new message without the "data" span
+    modified_msg = GeneratedMessage(data=msg.data, values=msg.values, field_spans={"len": msg.field_spans["len"]})
+    m = Mutator(schema)
+    buf = bytearray(modified_msg.data)
+    # Should not crash when target span doesn't exist
+    m._corrupt_length(buf, modified_msg, random.Random(0))
 
 
 def test_corrupt_length_overflow_path():

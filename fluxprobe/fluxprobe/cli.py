@@ -17,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=100, help="Number of frames to send")
     parser.add_argument("--mutation-rate", type=float, default=0.3, help="Probability to mutate a frame")
     parser.add_argument("--mutations-per-frame", type=int, default=1, help="How many mutation ops per mutated frame")
+    parser.add_argument("--payload-size", type=int, help="Force payload field size (bytes/string) and fill with default data")
     parser.add_argument("--recv-timeout", type=float, default=0.0, help="Seconds to wait for responses (0 to skip)")
     parser.add_argument("--seed", type=int, help="RNG seed for reproducibility")
     parser.add_argument("--delay-ms", type=int, default=0, help="Delay between sends in milliseconds")
@@ -73,6 +74,7 @@ def main() -> None:
         iterations=args.iterations,
         mutation_rate=args.mutation_rate,
         mutations_per_frame=args.mutations_per_frame,
+        payload_size=args.payload_size,
         recv_timeout=args.recv_timeout,
         seed=args.seed,
         delay_ms=args.delay_ms,

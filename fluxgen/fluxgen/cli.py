@@ -46,6 +46,7 @@ def _parse_args(argv: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument("--interval", type=float, default=None, help="Interval between sends in seconds")
     parser.add_argument("--count", type=int, default=None, help="Packets per client (0 for infinite)")
     parser.add_argument("--payload", help="Optional payload as string or hex when --payload-hex is set")
+    parser.add_argument("--payload-size", type=int, help="Auto-generate a payload of N bytes when no payload is provided")
     parser.add_argument("--payload-hex", action="store_true", default=None, help="Treat payload as hex")
     parser.add_argument("--flood", action="store_true", default=None, help="Send as fast as possible")
     parser.add_argument("--rand-source", action="store_true", default=None, help="Randomize source identity per packet")

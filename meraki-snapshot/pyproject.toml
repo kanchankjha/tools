@@ -1,0 +1,20 @@
+[project]
+name = "meraki-snapshot"
+version = "0.1.0"
+description = "Backup and restore Meraki Dashboard org configuration."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["meraki", "backup", "restore", "networking"]
+authors = [{ name = "Codex", email = "ops@example.com" }]
+dependencies = []
+
+[project.scripts]
+meraki-snapshot = "meraki_snapshot.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-q"

@@ -1,7 +1,7 @@
 import logging
 import struct
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from .schema import FieldSpec, ProtocolSchema
 
@@ -69,10 +69,35 @@ def _ensure_bytes(value: object, field: FieldSpec) -> bytes:
     raise ValueError(f"Cannot convert value '{value}' for field {field.name}")
 
 
-def generate_valid_message(schema: ProtocolSchema, rng) -> GeneratedMessage:
+def _default_payload_for_field(field: FieldSpec, desired_size: int, fill_byte: int) -> object:
+    """
+    Create deterministic filler for payload-like fields when requested.
+    """
+    if desired_size < 0:
+        raise ValueError("payload_size must be >= 0")
+
+    # Respect fixed lengths / bounds from schema to avoid invalid frames
+    min_len = 0 if field.min_length is None else int(field.min_length)
+    max_len = desired_size if field.max_length is None else int(field.max_length)
+    size = desired_size
+    if field.length is not None:
+        size = field.length
+    else:
+        size = min(size, max_len)
+        size = max(size, min_len)
+
+    if field.type == "string":
+        return chr(fill_byte) * size
+    return bytes([fill_byte]) * size
+
+
+def generate_valid_message(schema: ProtocolSchema, rng, payload_size: Optional[int] = None, payload_fill: int = 0x41) -> GeneratedMessage:
     values: Dict[str, object] = {}
     for field in schema.message.fields:
         if field.length_of:
+            continue
+        if payload_size is not None and field.name == "payload" and field.type in ("bytes", "string"):
+            values[field.name] = _default_payload_for_field(field, payload_size, payload_fill)
             continue
         values[field.name] = field.default if field.default is not None else _generate_field_value(field, rng)
 

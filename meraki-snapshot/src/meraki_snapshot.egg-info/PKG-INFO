@@ -1,0 +1,66 @@
+Metadata-Version: 2.4
+Name: meraki-snapshot
+Version: 0.1.0
+Summary: Backup and restore Meraki Dashboard org configuration.
+Author-email: Codex <ops@example.com>
+License: MIT
+Keywords: meraki,backup,restore,networking
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+
+# Meraki Snapshot
+
+Python CLI to crawl a Meraki Dashboard organization, capture network configurations, store them locally, and reapply them when needed.
+
+## Features
+- Discovers all networks for an org and gathers per-product settings (appliance, switch, wireless, camera where supported).
+- Stores backups under `backups/<org_id>/<timestamp>/` with JSON payloads and an index file.
+- Dry-run friendly restore planner that orders operations safely before applying them.
+- No external dependencies; uses the Meraki Dashboard REST API directly with retries and rate-limit backoff.
+
+## Quickstart
+1. Ensure Python 3.9+ is available.
+2. Set your API key as an environment variable: `export MERAKI_API_KEY=<key>`.
+3. Run a backup:
+   ```bash
+   python -m meraki_snapshot.cli backup --org-id <ORG_ID> --output ./backups
+   ```
+4. Inspect backups:
+   ```bash
+   python -m meraki_snapshot.cli list --output ./backups
+   ```
+5. Plan a restore (dry-run by default):
+   ```bash
+   python -m meraki_snapshot.cli restore --org-id <ORG_ID> --from-backup <timestamp> --output ./backups --dry-run
+   ```
+
+## Configuration and Auth
+- API key is read from `--api-key` flag or `MERAKI_API_KEY` env var.
+- Base URL defaults to `https://api.meraki.com/api/v1`; override with `--base-url` for EU or custom shards.
+
+## Storage Layout
+```
+backups/
+  <org_id>/
+    <timestamp>/
+      index.json          # Org metadata and inventory overview
+      <network_name>/     # Slugified network name
+        metadata.json     # Network metadata and devices
+        config.json       # Network-level settings
+```
+
+## Restore Strategy
+- Applies org prerequisites, then network-level basics, then product-specific settings in a stable order.
+- Honors rate-limit headers, retries transient errors, and surfaces a plan before applying changes.
+- Template-bound networks are detected; restore prefers rebinding to templates rather than overwriting.
+
+## Development
+- Run unit tests: `python -m pytest tests -q`
+- Linting/formatting is not enforced; keep code black-compatible and documented.
+
+## Caveats
+- Not all Meraki settings are writable via API; WAN uplinks and some camera/SM fields are read-only and are skipped during restore.
+- Restore requires careful validation in a lab org before production use.

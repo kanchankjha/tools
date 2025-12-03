@@ -1,0 +1,2 @@
+[console_scripts]
+meraki-snapshot = meraki_snapshot.cli:main

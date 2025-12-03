@@ -1,0 +1,23 @@
+interface: eth0
+subnet: 10.20.30.0/24
+instances: 3
+
+vpn:
+  server: vpn.example.com
+  username: alice
+  password: ${VPN_PASSWORD}  # resolve via env var or replace directly
+  protocol: anyconnect
+  extra_args: []
+
+routing:
+  mode: full  # options: full, split
+  include: []  # CIDRs to include if using split
+
+dns:
+  servers:
+    - 10.0.0.10
+    - 10.0.0.11
+
+logging:
+  level: info
+  directory: /var/log/octotunnel

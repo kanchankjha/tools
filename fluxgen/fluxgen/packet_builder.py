@@ -121,7 +121,11 @@ def _build_payload(cfg: RuntimeConfig) -> Raw | None:
     Build payload from config, supporting both text and hex formats.
     """
     if cfg.payload is None:
-        return None
+        if cfg.payload_size is None or cfg.payload_size <= 0:
+            return None
+        data_bytes = bytes([0x41]) * cfg.payload_size  # Default to 'A' bytes
+        return Raw(load=data_bytes)
+
     data = cfg.payload
     if cfg.payload_hex:
         try:
