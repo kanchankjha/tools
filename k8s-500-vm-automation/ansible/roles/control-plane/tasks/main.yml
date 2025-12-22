@@ -1,0 +1,94 @@
+---
+- name: Ensure kube_api_endpoint is set
+  ansible.builtin.assert:
+    that:
+      - kube_api_endpoint | length > 0
+    fail_msg: "Set kube_api_endpoint (e.g., export KUBE_API_ENDPOINT with NLB DNS)"
+
+- name: Check if kubeadm already initialized
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: admin_conf
+
+- name: Render kubeadm config
+  when: not admin_conf.stat.exists and inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.copy:
+    dest: /tmp/kubeadm-config.yaml
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: ClusterConfiguration
+      kubernetesVersion: stable
+      controlPlaneEndpoint: "{{ kube_api_endpoint }}:6443"
+      networking:
+        podSubnet: "{{ cluster_cidr }}"
+        serviceSubnet: "{{ service_cidr }}"
+      apiServer:
+        extraArgs:
+          enable-admission-plugins: NodeRestriction
+          max-mutating-requests-inflight: "2000"
+          max-requests-inflight: "4000"
+      controllerManager:
+        extraArgs:
+          node-cidr-mask-size: "24"
+      scheduler: {}
+      certificatesDir: /etc/kubernetes/pki
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Initialize control plane
+  when: not admin_conf.stat.exists and inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.command: kubeadm init --config /tmp/kubeadm-config.yaml --upload-certs
+  args:
+    creates: /etc/kubernetes/admin.conf
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: Set up kubeconfig for root
+  when: admin_conf.stat.exists and inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.command: /bin/sh -c 'mkdir -p /root/.kube && cp /etc/kubernetes/admin.conf /root/.kube/config && chown root:root /root/.kube/config'
+  args:
+    creates: /root/.kube/config
+
+- name: Upload CNI (Calico)
+  when: inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.command: kubectl apply -f {{ pod_network_manifest }}
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: Generate worker join command
+  when: inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.command: kubeadm token create --print-join-command
+  register: worker_join
+
+- name: Upload certs for control-plane join
+  when: inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
+  register: cert_upload
+
+- name: Build control-plane join command
+  when: inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.set_fact:
+    kubeadm_join_command: "{{ worker_join.stdout }}"
+    kubeadm_cp_join_command: "{{ worker_join.stdout }} --control-plane --certificate-key {{ cert_upload.stdout_lines[-1] | trim }}"
+
+- name: Fetch admin kubeconfig to artifacts
+  when: inventory_hostname == groups['control_plane'][0]
+  ansible.builtin.fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: ../../artifacts/admin.conf
+    flat: true
+
+- name: Join secondary control-plane nodes
+  when:
+    - inventory_hostname != groups['control_plane'][0]
+    - not admin_conf.stat.exists
+  ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].kubeadm_cp_join_command }} --apiserver-advertise-address {{ ansible_default_ipv4.address }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+
+- name: Wait for kubelet ready
+  ansible.builtin.systemd:
+    name: kubelet
+    state: started
+    enabled: true

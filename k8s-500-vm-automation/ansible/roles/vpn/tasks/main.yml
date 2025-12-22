@@ -1,0 +1,20 @@
+---
+- name: Ensure VPN password is provided
+  ansible.builtin.fail:
+    msg: "vpn_password must be set (export VPN_PASSWORD)"
+  when: vpn_password | length == 0
+
+- name: Write VPN secret
+  ansible.builtin.copy:
+    dest: /etc/openconnect/secret.env
+    content: "VPN_PASS={{ vpn_password | quote }}\n"
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Reload systemd and restart openconnect
+  ansible.builtin.systemd:
+    name: openconnect
+    daemon_reload: true
+    state: restarted
+    enabled: true

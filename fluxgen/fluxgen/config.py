@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import ipaddress
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -17,6 +18,7 @@ class RuntimeConfig:
     clients: int = 1
     subnet_pool: Optional[str] = None
     dest_subnet: Optional[str] = None
+    ip_version: int = 4
     dport: Optional[int] = None
     sport: Optional[int] = None
     proto: str = "tcp"
@@ -24,7 +26,7 @@ class RuntimeConfig:
     interval: float = 0.1
     count: int = 1
     payload: Optional[str] = None
-    payload_size: Optional[int] = None
+    data_size: Optional[int] = None
     payload_hex: bool = False
     flood: bool = False
     rand_source: bool = False
@@ -34,6 +36,7 @@ class RuntimeConfig:
     ip_id: Optional[int] = None
     frag: bool = False
     frag_size: Optional[int] = None
+    frag_mode: str = "fixed"
     icmp_type: int = 8
     icmp_code: int = 0
     dry_run: bool = False
@@ -95,11 +98,6 @@ def build_runtime_config(data: Dict[str, Any]) -> RuntimeConfig:
     if sport is not None and not (0 <= sport <= 65535):
         raise ValueError(f"Invalid source port: {sport} (must be 0-65535)")
 
-    # Validate payload size
-    payload_size = _maybe_int(data.get("payload_size"))
-    if payload_size is not None and payload_size < 0:
-        raise ValueError("payload_size must be >= 0 when provided")
-
     # Validate TCP flags
     flags = str(data.get("flags", "S") or "S")
     if not _validate_tcp_flags(flags):
@@ -119,12 +117,24 @@ def build_runtime_config(data: Dict[str, Any]) -> RuntimeConfig:
     if proto not in valid_protocols:
         raise ValueError(f"Invalid protocol: {proto} (must be one of {', '.join(sorted(valid_protocols))})")
 
+    ip_version = _resolve_ip_version(data)
+
+    data_size = _maybe_int(data.get("data_size"))
+    if data_size is not None and data_size <= 0:
+        raise ValueError("data_size must be a positive integer")
+    frag_mode = str(data.get("frag_mode", "fixed") or "fixed").lower()
+    if frag_mode not in {"fixed", "random"}:
+        raise ValueError("frag_mode must be one of: fixed, random")
+    if data.get("payload") is not None and data_size:
+        raise ValueError("Specify either payload or data_size, not both")
+
     return RuntimeConfig(
         interface=data["interface"],
         dst=str(data.get("dst", "") or ""),
         clients=_as_int(data.get("clients"), default=1),
         subnet_pool=data.get("subnet_pool"),
         dest_subnet=data.get("dest_subnet"),
+        ip_version=ip_version,
         dport=dport,
         sport=sport,
         proto=proto,
@@ -132,7 +142,7 @@ def build_runtime_config(data: Dict[str, Any]) -> RuntimeConfig:
         interval=_as_float(data.get("interval"), default=0.1),
         count=_as_int(data.get("count"), default=1),
         payload=data.get("payload"),
-        payload_size=payload_size,
+        data_size=data_size,
         payload_hex=bool(data.get("payload_hex", False)),
         flood=bool(data.get("flood", False)),
         rand_source=bool(data.get("rand_source", False)),
@@ -142,6 +152,7 @@ def build_runtime_config(data: Dict[str, Any]) -> RuntimeConfig:
         ip_id=_maybe_int(data.get("ip_id")),
         frag=bool(data.get("frag", False)),
         frag_size=_maybe_int(data.get("frag_size")),
+        frag_mode=frag_mode,
         icmp_type=icmp_type,
         icmp_code=icmp_code,
         dry_run=bool(data.get("dry_run", False)),
@@ -168,6 +179,7 @@ def _known_keys() -> set:
         "clients",
         "subnet_pool",
         "dest_subnet",
+        "ip_version",
         "dport",
         "sport",
         "proto",
@@ -175,7 +187,7 @@ def _known_keys() -> set:
         "interval",
         "count",
         "payload",
-        "payload_size",
+        "data_size",
         "payload_hex",
         "flood",
         "rand_source",
@@ -185,6 +197,7 @@ def _known_keys() -> set:
         "ip_id",
         "frag",
         "frag_size",
+        "frag_mode",
         "icmp_type",
         "icmp_code",
         "dry_run",
@@ -214,3 +227,46 @@ def _validate_tcp_flags(flags: str) -> bool:
     """
     valid_flags = set("SAFPRU")
     return all(c in valid_flags for c in flags.upper())
+
+
+def _resolve_ip_version(data: Dict[str, Any]) -> int:
+    """
+    Resolve IP version from config with support for auto-detection.
+    """
+    raw = data.get("ip_version", "auto")
+    if isinstance(raw, int):
+        raw_str = str(raw)
+    else:
+        raw_str = str(raw or "auto").lower()
+
+    if raw_str in {"4", "ipv4"}:
+        desired = 4
+    elif raw_str in {"6", "ipv6"}:
+        desired = 6
+    elif raw_str in {"auto", ""}:
+        desired = 0
+    else:
+        raise ValueError("ip_version must be one of: 4, 6, auto")
+
+    detected: Optional[int] = None
+    dst = data.get("dst")
+    dest_subnet = data.get("dest_subnet")
+    for target in (dst, dest_subnet):
+        if not target:
+            continue
+        try:
+            net = ipaddress.ip_network(target, strict=False)
+            detected = net.version
+            break
+        except (ValueError, TypeError):
+            try:
+                detected = ipaddress.ip_address(target).version  # type: ignore[arg-type]
+                break
+            except (ValueError, TypeError):
+                continue
+
+    if desired and detected and desired != detected:
+        raise ValueError(f"ip_version {desired} does not match provided address family {detected}")
+    if desired:
+        return desired
+    return detected or 4

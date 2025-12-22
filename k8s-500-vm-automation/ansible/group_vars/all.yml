@@ -1,0 +1,7 @@
+kube_api_endpoint: ""
+cluster_cidr: "10.244.0.0/16"
+service_cidr: "10.96.0.0/12"
+pod_network_manifest: "https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml"
+vpn_headend: "{{ lookup('env', 'VPN_HEADEND') | default('') }}"
+vpn_user: "{{ lookup('env', 'VPN_USER') | default('') }}"
+vpn_password: "{{ lookup('env', 'VPN_PASSWORD') | default('') }}"

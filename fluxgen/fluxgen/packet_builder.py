@@ -13,6 +13,7 @@ from scapy.all import (  # type: ignore
     ESP,
     GRE,
     Ether,
+    IPv6,
     ICMP,
     IP,
     SCTP,
@@ -22,6 +23,7 @@ from scapy.all import (  # type: ignore
     RandShort,
     Raw,
     fragment,
+    fragment6,
 )
 try:
     from scapy.contrib.igmp import IGMP  # type: ignore
@@ -53,14 +55,22 @@ def build_frames(
     Returns:
         List of Scapy frame objects ready to send
     """
-    ip_layer = IP(
-        src=str(identity.ip),
-        dst=dest_ip,
-        ttl=cfg.ttl,
-        tos=cfg.tos,
-    )
-    if cfg.ip_id is not None:
-        ip_layer.id = cfg.ip_id
+    if cfg.ip_version == 6:
+        ip_layer = IPv6(
+            src=str(identity.ip),
+            dst=dest_ip,
+            hlim=cfg.ttl,
+            tc=cfg.tos,
+        )
+    else:
+        ip_layer = IP(
+            src=str(identity.ip),
+            dst=dest_ip,
+            ttl=cfg.ttl,
+            tos=cfg.tos,
+        )
+        if cfg.ip_id is not None:
+            ip_layer.id = cfg.ip_id
 
     payload = _build_payload(cfg)
 
@@ -78,8 +88,21 @@ def build_frames(
             dport=cfg.dport or 0,
         )
     elif cfg.proto == "icmp":
-        transport = ICMP(type=cfg.icmp_type, code=cfg.icmp_code)
+        if cfg.ip_version == 6:
+            from scapy.layers.inet6 import ICMPv6EchoRequest, ICMPv6EchoReply, ICMPv6Unknown  # type: ignore
+            # Default to echo request for IPv6, but allow customization
+            if cfg.icmp_type == 8 or cfg.icmp_type == 128:  # Echo request
+                transport = ICMPv6EchoRequest()
+            elif cfg.icmp_type == 129:  # Echo reply
+                transport = ICMPv6EchoReply()
+            else:
+                # For other ICMPv6 types, use generic ICMPv6Unknown
+                transport = ICMPv6Unknown(type=cfg.icmp_type, code=cfg.icmp_code)
+        else:
+            transport = ICMP(type=cfg.icmp_type, code=cfg.icmp_code)
     elif cfg.proto == "igmp":
+        if cfg.ip_version == 6:
+            raise ValueError("IGMP is only supported for IPv4")
         # IGMP (Internet Group Management Protocol) - multicast group management
         transport = IGMP(type=cfg.icmp_type, mrcode=cfg.icmp_code)
     elif cfg.proto == "gre":
@@ -111,7 +134,14 @@ def build_frames(
 
     if cfg.frag:
         # Default fragment size is 1480 bytes (typical 1500 MTU - 20 IP header)
-        fragments = fragment(base_pkt[IP], fragsize=cfg.frag_size or 1480)
+        fragsize = cfg.frag_size or 1480
+        if cfg.frag_mode == "random":
+            lower = max(8, fragsize // 2)
+            fragsize = random.randint(lower, fragsize)
+        if cfg.ip_version == 6:
+            fragments = fragment6(base_pkt[IPv6], fragsize=fragsize)
+            return [ether / frag for frag in fragments]
+        fragments = fragment(base_pkt[IP], fragsize=fragsize)
         return [ether / frag for frag in fragments]
     return [base_pkt]
 
@@ -121,11 +151,10 @@ def _build_payload(cfg: RuntimeConfig) -> Raw | None:
     Build payload from config, supporting both text and hex formats.
     """
     if cfg.payload is None:
-        if cfg.payload_size is None or cfg.payload_size <= 0:
-            return None
-        data_bytes = bytes([0x41]) * cfg.payload_size  # Default to 'A' bytes
-        return Raw(load=data_bytes)
-
+        if cfg.data_size is not None:
+            data_bytes = os.urandom(cfg.data_size)
+            return Raw(load=data_bytes)
+        return None
     data = cfg.payload
     if cfg.payload_hex:
         try:

@@ -16,6 +16,13 @@ class TestIdentity:
         assert identity.ip == ip
         assert identity.mac == mac
 
+    def test_identity_creation_ipv6(self):
+        """Test creating Identity with IPv6."""
+        ip = ipaddress.IPv6Address("2001:db8::1")
+        mac = "02:00:00:aa:bb:cc"
+        identity = Identity(ip=ip, mac=mac)
+        assert identity.ip == ip
+
 
 class TestMacSeed:
     """Test MAC seed generation."""
@@ -182,3 +189,27 @@ class TestGenerateIdentities:
         # Verify all are in network
         for identity in identities:
             assert identity.ip in network
+
+    def test_generate_identities_ipv6(self):
+        """Test generating identities in IPv6 subnet without full enumeration."""
+        network = ipaddress.ip_network("2001:db8::/120")  # 256 addresses
+        identities = generate_identities(
+            count=5,
+            network=network,
+            exclude_ips=["2001:db8::"],
+        )
+        assert len(identities) == 5
+        for identity in identities:
+            assert isinstance(identity.ip, ipaddress.IPv6Address)
+            assert identity.ip in network
+            assert str(identity.ip) != "2001:db8::"
+
+    def test_generate_identities_ipv6_insufficient(self):
+        """Test not enough IPv6 addresses raises error."""
+        network = ipaddress.ip_network("2001:db8::/128")
+        with pytest.raises(ValueError, match="Not enough usable IPs"):
+            generate_identities(
+                count=2,
+                network=network,
+                exclude_ips=[],
+            )

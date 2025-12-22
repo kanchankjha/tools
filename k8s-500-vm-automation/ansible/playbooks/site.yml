@@ -1,0 +1,18 @@
+---
+- name: Bootstrap control plane
+  hosts: control_plane
+  become: true
+  serial: 1
+  roles:
+    - vpn
+    - kubernetes-common
+    - control-plane
+
+- name: Join workers
+  hosts: worker
+  become: true
+  serial: 50
+  roles:
+    - vpn
+    - kubernetes-common
+    - worker

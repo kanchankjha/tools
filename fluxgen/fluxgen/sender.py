@@ -10,10 +10,11 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Union
 
 from scapy.all import PcapWriter, sendp  # type: ignore
 from scapy.layers.l2 import getmacbyip  # type: ignore
+from scapy.layers.inet6 import getmacbyip6  # type: ignore
 
 from .config import RuntimeConfig
 from .identity import Identity, generate_identities
@@ -52,7 +53,7 @@ class Simulator:
         self.writer: Optional[PcapWriter] = None
 
     def run(self, pcap_writer: Optional[PcapWriter] = None) -> SendStats:
-        iface_info = get_interface_info(self.cfg.interface)
+        iface_info = get_interface_info(self.cfg.interface, self.cfg.ip_version)
         network = (
             ipaddress.ip_network(self.cfg.subnet_pool, strict=False)
             if self.cfg.subnet_pool
@@ -114,11 +115,11 @@ class Simulator:
 
         return self.stats
 
-    def _client_loop(self, identity: Identity, dest_pool: List[str], pcap_writer: Optional[PcapWriter]) -> None:
+    def _client_loop(self, identity: Identity, dest_pool: Union[List[str], ipaddress._BaseNetwork], pcap_writer: Optional[PcapWriter]) -> None:
         count_limit = self.cfg.count if self.cfg.count > 0 else None
         sends = 0
         while not self.stop_event.is_set():
-            dest_ip = random.choice(dest_pool) if self.cfg.rand_dest else dest_pool[0]
+            dest_ip = _choose_dest_ip(self.cfg, dest_pool)
             chosen_identity = (
                 random.choice(self.identities) if self.cfg.rand_source else identity
             )
@@ -163,11 +164,14 @@ class Simulator:
         """
         if dest_ip in self.dest_mac_cache:
             return self.dest_mac_cache[dest_ip]
-        mac = getmacbyip(dest_ip)
+        if self.cfg.ip_version == 6:
+            mac = getmacbyip6(dest_ip)
+        else:
+            mac = getmacbyip(dest_ip)
         if not mac:
             if self.cfg.verbose:
                 print(f"Warning: MAC resolution failed for {dest_ip}, using broadcast MAC", file=sys.stderr)
-            mac = "ff:ff:ff:ff:ff:ff"
+            mac = "33:33:00:00:00:01" if self.cfg.ip_version == 6 else "ff:ff:ff:ff:ff:ff"
         self.dest_mac_cache[dest_ip] = mac
         return mac
 
@@ -182,10 +186,25 @@ class Simulator:
             print(f"sent={self.stats.sent} errors={self.stats.errors}")
 
 
-def _build_dest_pool(cfg: RuntimeConfig) -> List[str]:
+def _build_dest_pool(cfg: RuntimeConfig) -> Union[List[str], ipaddress._BaseNetwork]:
     if cfg.rand_dest and cfg.dest_subnet:
-        subnet = ipaddress.ip_network(cfg.dest_subnet, strict=False)
-        return [str(ip) for ip in subnet.hosts()]
+        return ipaddress.ip_network(cfg.dest_subnet, strict=False)
     if cfg.dst:
         return [cfg.dst]
     return []
+
+
+def _choose_dest_ip(cfg: RuntimeConfig, pool: Union[List[str], ipaddress._BaseNetwork]) -> str:
+    if isinstance(pool, list):
+        return random.choice(pool) if cfg.rand_dest and len(pool) > 1 else pool[0]
+    # pool is an ip_network
+    if pool.version == 4:
+        hosts = list(pool.hosts())
+        if not hosts:
+            raise ValueError(f"No usable hosts in destination subnet {pool}")
+        return str(random.choice(hosts))
+    # IPv6 - sample randomly from the subnet (avoid network address when possible)
+    max_offset = pool.num_addresses - 1
+    if max_offset <= 0:
+        return str(pool.network_address)
+    return str(ipaddress.IPv6Address(int(pool.network_address) + random.randrange(1, max_offset + 1)))

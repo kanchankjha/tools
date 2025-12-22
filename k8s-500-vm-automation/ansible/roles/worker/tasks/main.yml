@@ -1,0 +1,21 @@
+---
+- name: Ensure join command is available
+  ansible.builtin.assert:
+    that:
+      - hostvars[groups['control_plane'][0]].kubeadm_join_command is defined
+    fail_msg: "kubeadm_join_command not found; ensure control-plane play ran first"
+
+- name: Check if worker already joined
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf
+
+- name: Join worker to cluster
+  when: not kubelet_conf.stat.exists
+  ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command }} --apiserver-advertise-address {{ ansible_default_ipv4.address }}"
+
+- name: Ensure kubelet running
+  ansible.builtin.systemd:
+    name: kubelet
+    state: started
+    enabled: true

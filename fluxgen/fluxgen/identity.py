@@ -12,26 +12,37 @@ from typing import Iterable, List, Optional, Set
 
 @dataclass
 class Identity:
-    ip: ipaddress.IPv4Address
+    ip: ipaddress._BaseAddress
     mac: str
 
 
 def generate_identities(
     count: int,
-    network: ipaddress.IPv4Network,
+    network: ipaddress._BaseNetwork,
     exclude_ips: Iterable[str],
     base_mac: Optional[str] = None,
 ) -> List[Identity]:
     excluded: Set[str] = {str(ip) for ip in exclude_ips}
-    hosts = [ip for ip in network.hosts() if str(ip) not in excluded]
-    if len(hosts) < count:
-        raise ValueError(f"Not enough usable IPs in {network} to allocate {count} clients")
+    identities: List[Identity] = []
+    if network.version == 4:
+        hosts = [ip for ip in network.hosts() if str(ip) not in excluded]
+        if len(hosts) < count:
+            raise ValueError(f"Not enough usable IPs in {network} to allocate {count} clients")
+        source_hosts = hosts
+    else:
+        available = network.num_addresses - len(excluded)
+        if available < count:
+            raise ValueError(f"Not enough usable IPs in {network} to allocate {count} clients")
+        source_hosts = None  # Will generate randomly for IPv6
 
     mac_seed = _mac_seed(base_mac)
-    identities: List[Identity] = []
     for idx in range(count):
+        if source_hosts is not None:
+            ip = source_hosts[idx]
+        else:
+            ip = _random_ipv6_host(network, excluded, idx)
         mac = _mac_from_seed(mac_seed, idx)
-        identities.append(Identity(ip=hosts[idx], mac=mac))
+        identities.append(Identity(ip=ip, mac=mac))
     return identities
 
 
@@ -81,3 +92,27 @@ def _mac_from_seed(seed: List[int], index: int) -> str:
     mac_int = (mac_int + index + 1) % (1 << 48)
     mac = mac_int.to_bytes(6, "big")
     return ":".join(f"{byte:02x}" for byte in mac)
+
+
+def _random_ipv6_host(network: ipaddress.IPv6Network, excluded: Set[str], offset: int) -> ipaddress.IPv6Address:
+    """
+    Generate a deterministic-but-randomized IPv6 host inside a network.
+    """
+    # Use deterministic seed per offset to keep reproducible across runs/tests
+    rng = random.Random(offset)
+    attempts = 0
+    while True:
+        attempts += 1
+        if attempts > 1000:
+            raise ValueError(f"Unable to allocate unique IPv6 addresses in {network}")
+        # Avoid the network address where possible
+        max_offset = network.num_addresses - 1
+        if max_offset <= 0:
+            candidate = network.network_address
+        else:
+            candidate_int = int(network.network_address) + rng.randrange(1, max_offset + 1)
+            candidate = ipaddress.IPv6Address(candidate_int)
+        if str(candidate) in excluded:
+            continue
+        excluded.add(str(candidate))
+        return candidate

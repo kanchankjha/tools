@@ -72,9 +72,8 @@ class TestBuildDestPool:
             dest_subnet="192.168.1.0/30",
         )
         pool = _build_dest_pool(cfg)
-        assert len(pool) == 2  # /30 has 2 usable hosts
-        assert "192.168.1.1" in pool
-        assert "192.168.1.2" in pool
+        assert str(pool) == "192.168.1.0/30"
+        assert pool.version == 4
 
     def test_build_dest_pool_empty(self):
         """Test building pool with no destination."""
@@ -91,6 +90,19 @@ class TestBuildDestPool:
         )
         pool = _build_dest_pool(cfg)
         assert pool == ["10.0.0.5"]
+
+    def test_build_dest_pool_ipv6_subnet(self):
+        """Test building pool for IPv6 subnet."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            rand_dest=True,
+            dest_subnet="2001:db8::/126",
+            ip_version=6,
+        )
+        pool = _build_dest_pool(cfg)
+        assert str(pool) == "2001:db8::/126"
+        assert pool.version == 6
 
 
 class TestSimulator:
@@ -186,6 +198,18 @@ class TestSimulator:
         mac = sim._resolve_dest_mac("10.0.0.1")
         assert mac == "ff:ff:ff:ff:ff:ff"
         assert "10.0.0.1" in sim.dest_mac_cache
+
+    @patch("fluxgen.sender.getmacbyip6")
+    def test_simulator_resolve_dest_mac_fallback_ipv6(self, mock_getmac6):
+        """Test MAC resolution falls back for IPv6."""
+        mock_getmac6.return_value = None
+
+        cfg = RuntimeConfig(interface="eth0", dst="2001:db8::1", verbose=False, ip_version=6)
+        sim = Simulator(cfg)
+
+        mac = sim._resolve_dest_mac("2001:db8::1")
+        assert mac == "33:33:00:00:00:01"
+        assert "2001:db8::1" in sim.dest_mac_cache
 
     @patch("fluxgen.sender.getmacbyip")
     def test_simulator_resolve_dest_mac_with_verbose(self, mock_getmac, capsys):

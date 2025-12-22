@@ -1,0 +1,60 @@
+---
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - containerd
+      - kubelet
+      - kubeadm
+      - kubectl
+      - openconnect
+    state: present
+    update_cache: true
+
+- name: Ensure containerd config
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      version = 2
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+          SystemdCgroup = true
+  notify: Restart containerd
+
+- name: Configure kubelet drop-in
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/kubelet.service.d/20-extra-args.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Service]
+      Environment="KUBELET_EXTRA_ARGS=--node-ip=$(hostname -I | awk '{print $1}') --node-status-update-frequency=10s"
+  notify: Restart kubelet
+
+- name: Ensure containerd enabled
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Ensure kubelet enabled (may be not-ready until joined)
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    state: started
+
+handlers:
+  - name: Restart containerd
+    ansible.builtin.systemd:
+      name: containerd
+      state: restarted
+      daemon_reload: true
+  - name: Restart kubelet
+    ansible.builtin.systemd:
+      name: kubelet
+      state: restarted
+      daemon_reload: true

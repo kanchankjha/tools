@@ -1,0 +1,16 @@
+plugin: amazon.aws.aws_ec2
+regions:
+  - {{ lookup('env', 'AWS_REGION') | default('us-east-1') }}
+filters:
+  tag:Project: "{{ lookup('env', 'PROJECT_TAG') | default('k8s-500') }}"
+keyed_groups:
+  - key: tags.Role
+    prefix: ""
+  - key: tags.Project
+    prefix: project_
+compose:
+  ansible_host: public_ip_address
+hostnames:
+  - ip_address
+  - private_dns_name
+  - public_dns_name

@@ -17,58 +17,13 @@
 
 ## Installation
 
-### Quick Start (Ubuntu/Kali Linux)
-
-For experienced users, here's a complete installation in one go:
-
-```bash
-# Install system dependencies
-sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv \
-    python3-dev build-essential git libpcap-dev tcpdump
-
-# Clone and setup
-git clone https://github.com/kanchankjha/tools.git
-cd tools/fluxgen
-python3 -m venv .venv && source .venv/bin/activate
-pip install --upgrade pip && pip install -e .
-
-# Grant capabilities (choose one):
-sudo setcap cap_net_raw,cap_net_admin+ep .venv/bin/python3  # Recommended
-# OR run with sudo
-
-# Test installation
-fluxgen --help
-```
-
-### Detailed Installation Steps
-
 ### Prerequisites
 
-#### System Requirements
 - **Python 3.8+** (tested with Python 3.12)
 - **Linux** operating system (required for raw socket support)
 - **Root privileges** or CAP_NET_RAW capability
 - **Git** for cloning the repository
 - **pip** for installing dependencies
-
-#### Ubuntu/Kali Linux System Packages
-
-fluxgen requires C compilation tools for the `netifaces` extension:
-
-```bash
-# Update package list
-sudo apt-get update
-
-# Install required system packages
-sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
-                        build-essential git libpcap-dev tcpdump
-```
-
-**Package explanations:**
-- `python3-dev` - Python headers for C extensions
-- `build-essential` - GCC compiler and build tools
-- `libpcap-dev` - Packet capture library (for Scapy)
-- `tcpdump` - Useful for verifying packet generation
 
 ### Step 1: Clone the Repository
 
@@ -252,8 +207,11 @@ fluxgen --interface eth0 --clients 5 --dst 10.0.0.5 --dport 8080 --proto tcp --p
 # Hex payload
 fluxgen --interface eth0 --clients 5 --dst 10.0.0.5 --dport 8080 --proto udp --payload "deadbeef" --payload-hex --count 10
 
-# Auto-generated default payload of a specific size (fills with 'A' bytes)
-fluxgen --interface eth0 --clients 3 --dst 10.0.0.5 --dport 8080 --proto udp --payload-size 256 --count 10
+# Auto-generated payload of specific size
+fluxgen --interface eth0 --clients 2 --dst 10.0.0.5 --dport 53 --proto udp --data-size 512 --count 5
+
+# IPv6 example (auto-detects family)
+fluxgen --interface eth0 --clients 3 --dst 2001:db8::50 --dport 443 --proto tcp --ip-version auto --count 20
 ```
 
 ### 6. PCAP Capture
@@ -296,7 +254,9 @@ Key flags:
 - `--subnet-pool` CIDR to allocate client IPs (defaults to interface subnet)
 - `--rand-source` randomize client identity per packet
 - `--rand-dest --dest-subnet 10.0.0.0/24` randomize destination IPs
-- `--payload "deadbeef" --payload-hex` send custom payload
+- `--payload "deadbeef" --payload-hex` send custom payload, or `--data-size 1024` to auto-fill a payload
+- `--frag --frag-size 500 --frag-mode random` enable fragmentation with fixed or randomized fragment sizes
+- `--ip-version 4|6|auto` force IPv4/IPv6 or let fluxgen infer from destinations
 - `--flood` remove delay, `--dry-run` craft packets only, `--pcap-out out.pcap` write sent frames
 
 ### Common Use Cases
@@ -430,7 +390,6 @@ fluxgen --interface eth0 --clients 100 --dst 10.0.0.5 --dport 80 \
 #### Payload Options
 - `--payload STRING` - Packet payload as text
 - `--payload-hex` - Interpret payload as hexadecimal string (e.g., "deadbeef")
-- `--payload-size N` - Auto-generate N bytes of default payload when no payload string is provided
 
 #### Traffic Control
 - `--count N` - Packets to send per client (0 = infinite, default: 0)
@@ -669,36 +628,6 @@ pyenv install 3.11.0
 pyenv local 3.11.0
 ```
 
-#### 8. netifaces compilation errors on Ubuntu/Kali
-
-**Problem:** `error: command 'gcc' failed` or `netifaces` installation fails.
-
-**Solution:**
-```bash
-# Install required build dependencies
-sudo apt-get update
-sudo apt-get install -y python3-dev build-essential
-
-# Retry installation
-pip install netifaces>=0.11
-```
-
-#### 9. Scapy "No route found" errors on Kali/Ubuntu
-
-**Problem:** Scapy cannot find network routes.
-
-**Solution:**
-```bash
-# Check routing table
-ip route show
-
-# Ensure interface is up
-sudo ip link set eth0 up
-
-# Test with specific interface
-fluxgen --interface eth0 --dst 192.168.1.1 --dport 80 --count 1 --dry-run --verbose
-```
-
 ### Getting Help
 
 ```bash
@@ -851,3 +780,4 @@ pip install -e .
 ## License
 
 This project is provided as-is for educational and testing purposes. Ensure you have proper authorization before using fluxgen on any network.
+

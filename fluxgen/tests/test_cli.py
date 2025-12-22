@@ -30,6 +30,9 @@ class TestParseArgs:
             "--ttl", "32",
             "--verbose",
             "--quiet",
+            "--data-size", "16",
+            "--frag-mode", "random",
+            "--ip-version", "6",
         ]
         args = _parse_args(argv)
         assert args.interface == "eth0"
@@ -44,6 +47,9 @@ class TestParseArgs:
         assert args.ttl == 32
         assert args.verbose is True
         assert args.quiet is True
+        assert args.data_size == 16
+        assert args.frag_mode == "random"
+        assert args.ip_version == "6"
 
     def test_parse_args_protocol_choices(self):
         """Test all protocol choices are accepted."""
@@ -90,9 +96,11 @@ class TestParseArgs:
             "--dst", "10.0.0.1",
             "--payload", "deadbeef",
             "--payload-hex",
+            "--data-size", "32",
         ])
         assert args.payload == "deadbeef"
         assert args.payload_hex is True
+        assert args.data_size == 32
 
     def test_parse_args_subnet_options(self):
         """Test subnet-related arguments."""
@@ -124,9 +132,11 @@ class TestParseArgs:
             "--dst", "10.0.0.1",
             "--frag",
             "--frag-size", "500",
+            "--frag-mode", "fixed",
         ])
         assert args.frag is True
         assert args.frag_size == 500
+        assert args.frag_mode == "fixed"
 
 
 class TestMain:

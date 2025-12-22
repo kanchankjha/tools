@@ -20,8 +20,10 @@ class Transport:
 
 class TCPTransport(Transport):
     def __init__(self, host: str, port: int, timeout: float = 1.0) -> None:
-        self.sock = socket.create_connection((host, port), timeout=timeout)
+        family, socktype, proto, sockaddr = _resolve_address(host, port, socket.SOCK_STREAM)
+        self.sock = socket.socket(family, socktype, proto)
         self.sock.settimeout(timeout)
+        self.sock.connect(sockaddr)
 
     def send(self, data: bytes) -> None:
         self.sock.sendall(data)
@@ -43,8 +45,9 @@ class TCPTransport(Transport):
 
 class UDPTransport(Transport):
     def __init__(self, host: str, port: int, timeout: float = 1.0) -> None:
-        self.addr = (host, port)
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        family, socktype, proto, sockaddr = _resolve_address(host, port, socket.SOCK_DGRAM)
+        self.addr = sockaddr
+        self.sock = socket.socket(family, socktype, proto)
         self.sock.settimeout(timeout)
 
     def send(self, data: bytes) -> None:
@@ -72,3 +75,11 @@ def create_transport(spec: TransportSpec) -> Transport:
     if spec.type == "udp":
         return UDPTransport(spec.host, spec.port, spec.timeout)
     raise ValueError(f"Unsupported transport type: {spec.type}")
+
+
+def _resolve_address(host: str, port: int, socktype: int) -> tuple[int, int, int, tuple]:
+    infos = socket.getaddrinfo(host, port, 0, socktype)
+    if not infos:
+        raise ValueError(f"Unable to resolve address for {host}:{port}")
+    family, socktype, proto, _, sockaddr = infos[0]
+    return family, socktype, proto, sockaddr

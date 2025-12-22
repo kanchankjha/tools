@@ -6,44 +6,10 @@ FluxProbe is a lightweight, schema-driven protocol fuzzer. Point it at a protoco
 
 ## Installation
 
-### Quick Start (Ubuntu/Kali Linux)
-
-For experienced users, here's a complete installation in one go:
-
-```bash
-# Install system dependencies
-sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv git
-
-# Clone and setup
-git clone https://github.com/kanchankjha/tools.git
-cd tools/fluxprobe
-python3 -m venv .venv && source .venv/bin/activate
-pip install --upgrade pip && pip install -e .
-
-# Test installation
-fluxprobe --help
-```
-
-### Detailed Installation Steps
-
 ### Prerequisites
-
-#### System Requirements
 - **Python 3.9+** (tested with Python 3.12)
 - **Git** for cloning the repository
 - **pip** for installing dependencies
-
-#### Ubuntu/Kali Linux System Packages
-
-Before installing FluxProbe, ensure you have Python development tools:
-
-```bash
-# Update package list
-sudo apt-get update
-
-# Install Python and required tools
-sudo apt-get install -y python3 python3-pip python3-venv git
-```
 
 ### Step 1: Clone the Repository
 
@@ -151,6 +117,9 @@ python3 -m fluxprobe --protocol mqtt --target localhost:1883 --iterations 500 --
 
 # Fuzz Modbus/TCP device
 python3 -m fluxprobe --protocol modbus --target 10.0.0.5:502 --iterations 300 --mutation-rate 0.5
+
+# IPv6 target example
+python3 -m fluxprobe --protocol http --target "[2001:db8::50]":80 --iterations 50
 ```
 
 **Available built-in profiles:** `echo`, `http`, `dns`, `mqtt`, `modbus`, `coap`, `tcp`, `udp`, `ip`, `snmp`, `ssh`
@@ -178,9 +147,6 @@ python3 -m fluxprobe --protocol http --target localhost:80 --seed 12345 --iterat
 
 # High mutation rate for aggressive testing
 python3 -m fluxprobe --protocol mqtt --target broker:1883 --mutation-rate 0.9 --mutations-per-frame 3
-
-# Generate default payload of a fixed size (fills payload fields with 'A' bytes)
-python3 -m fluxprobe --protocol udp --target host:9000 --iterations 100 --payload-size 256
 
 # Slow down fuzzing with delays
 python3 -m fluxprobe --protocol modbus --target plc:502 --delay-ms 100 --iterations 500

@@ -5,6 +5,7 @@ import pytest
 from scapy.all import Ether, IP, TCP, UDP, ICMP, Raw
 from fluxgen.config import RuntimeConfig
 from fluxgen.identity import Identity
+import fluxgen.packet_builder as packet_builder
 from fluxgen.packet_builder import build_frames, _build_payload
 
 
@@ -183,6 +184,43 @@ class TestBuildFrames:
         assert frame.haslayer(Raw)
         assert frame[Raw].load == b"Hello World"
 
+    def test_build_frame_with_data_size_payload(self, test_identity):
+        """Test building frame when only data_size is provided."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="10.0.0.5",
+            proto="tcp",
+            dport=80,
+            data_size=32,
+        )
+
+        frames = build_frames(cfg, test_identity, "10.0.0.5", "aa:bb:cc:dd:ee:ff")
+
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.haslayer(Raw)
+        assert len(frame[Raw].load) == 32
+
+    def test_build_ipv6_frame(self, test_identity):
+        """Test building IPv6 TCP frame."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            proto="tcp",
+            dport=80,
+            sport=12345,
+            ip_version=6,
+        )
+
+        frames = build_frames(cfg, Identity(ip=ipaddress.IPv6Address("2001:db8::2"), mac=test_identity.mac), "2001:db8::1", "33:33:00:00:00:01")
+
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.haslayer(Ether)
+        assert frame.haslayer(packet_builder.IPv6)
+        assert frame[packet_builder.IPv6].src == "2001:db8::2"
+        assert frame[packet_builder.IPv6].dst == "2001:db8::1"
+
     def test_build_frame_with_hex_payload(self, test_identity):
         """Test building frame with hex payload."""
         cfg = RuntimeConfig(
@@ -254,6 +292,63 @@ class TestBuildFrames:
             assert frame.haslayer(Ether)
             assert frame.haslayer(IP)
 
+    def test_build_frame_with_ipv6_fragmentation(self, test_identity, monkeypatch):
+        """Test IPv6 fragmentation uses fragment6."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            proto="udp",
+            dport=1234,
+            payload="A" * 2000,
+            frag=True,
+            frag_size=1200,
+            frag_mode="fixed",
+            ip_version=6,
+        )
+
+        calls = {}
+
+        def fake_fragment6(pkt, fragsize):
+            calls["fragsize"] = fragsize
+            return [pkt]
+
+        monkeypatch.setattr(packet_builder, "fragment6", fake_fragment6)
+
+        frames = build_frames(cfg, Identity(ip=ipaddress.IPv6Address("2001:db8::2"), mac=test_identity.mac), "2001:db8::1", "33:33:00:00:00:01")
+
+        assert calls["fragsize"] == 1200
+        assert len(frames) == 1
+        assert frames[0].haslayer(packet_builder.IPv6)
+
+    def test_build_frame_with_random_fragmentation(self, test_identity, monkeypatch):
+        """Test random fragmentation selects randomized fragment size."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="10.0.0.5",
+            proto="tcp",
+            dport=80,
+            payload="A" * 2000,
+            frag=True,
+            frag_size=1200,
+            frag_mode="random",
+        )
+
+        recorded = {}
+
+        def fake_fragment(pkt, fragsize):
+            recorded["fragsize"] = fragsize
+            # Return at least one fragment to keep downstream happy
+            return [pkt]
+
+        monkeypatch.setattr(packet_builder, "fragment", fake_fragment)
+        monkeypatch.setattr(packet_builder.random, "randint", lambda low, high: high - 100)
+
+        frames = build_frames(cfg, test_identity, "10.0.0.5", "aa:bb:cc:dd:ee:ff")
+
+        assert recorded["fragsize"] == 1100
+        assert len(frames) == 1
+        assert frames[0].haslayer(Ether)
+
     def test_build_frame_unsupported_protocol(self, test_identity):
         """Test building frame with unsupported protocol raises error."""
         cfg = RuntimeConfig(
@@ -264,6 +359,60 @@ class TestBuildFrames:
 
         with pytest.raises(ValueError, match="Unsupported protocol"):
             build_frames(cfg, test_identity, "10.0.0.5", "aa:bb:cc:dd:ee:ff")
+
+    def test_build_frame_igmp_ipv6_not_supported(self, test_identity):
+        """Test IGMP is rejected for IPv6."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            proto="igmp",
+            ip_version=6,
+        )
+        with pytest.raises(ValueError, match="IGMP"):
+            build_frames(cfg, Identity(ip=ipaddress.IPv6Address("2001:db8::2"), mac=test_identity.mac), "2001:db8::1", "33:33:00:00:00:01")
+
+    def test_build_icmpv6_echo_request(self, test_identity):
+        """Test building ICMPv6 echo request frame."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            proto="icmp",
+            icmp_type=128,  # ICMPv6 echo request
+            ip_version=6,
+        )
+        frames = build_frames(cfg, Identity(ip=ipaddress.IPv6Address("2001:db8::2"), mac=test_identity.mac), "2001:db8::1", "33:33:00:00:00:01")
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.haslayer(packet_builder.IPv6)
+
+    def test_build_icmpv6_echo_reply(self, test_identity):
+        """Test building ICMPv6 echo reply frame."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            proto="icmp",
+            icmp_type=129,  # ICMPv6 echo reply
+            ip_version=6,
+        )
+        frames = build_frames(cfg, Identity(ip=ipaddress.IPv6Address("2001:db8::2"), mac=test_identity.mac), "2001:db8::1", "33:33:00:00:00:01")
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.haslayer(packet_builder.IPv6)
+
+    def test_build_icmpv6_unknown_type(self, test_identity):
+        """Test building ICMPv6 with custom type."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="2001:db8::1",
+            proto="icmp",
+            icmp_type=200,  # Custom ICMPv6 type
+            icmp_code=5,
+            ip_version=6,
+        )
+        frames = build_frames(cfg, Identity(ip=ipaddress.IPv6Address("2001:db8::2"), mac=test_identity.mac), "2001:db8::1", "33:33:00:00:00:01")
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.haslayer(packet_builder.IPv6)
 
 
 class TestBuildPayload:
@@ -310,6 +459,17 @@ class TestBuildPayload:
         payload = _build_payload(cfg)
         assert payload is not None
         assert payload.load == b"\xde\xad\xbe\xef"
+
+    def test_build_payload_with_data_size(self):
+        """Test building payload when data_size is set."""
+        cfg = RuntimeConfig(
+            interface="eth0",
+            dst="10.0.0.5",
+            data_size=16,
+        )
+        payload = _build_payload(cfg)
+        assert payload is not None
+        assert len(payload.load) == 16
 
     def test_build_payload_invalid_hex(self):
         """Test invalid hex payload raises error."""
@@ -379,4 +539,3 @@ class TestFrameEdgeCases:
         frame = frames[0]
         assert frame.haslayer(IP)
         # Verify SCTP layer was created
-

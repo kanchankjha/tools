@@ -1,0 +1,88 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - software-properties-common
+  - containerd
+  - jq
+  - openconnect
+  - iproute2
+  - socat
+  - ebtables
+  - ethtool
+
+write_files:
+  - path: /etc/modules-load.d/containerd.conf
+    content: |
+      overlay
+      br_netfilter
+  - path: /etc/sysctl.d/99-kubernetes-cri.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables = 1
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+  - path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    encoding: b64
+    content: |
+      LS0tLS1CRUdJTiBQR1AgUFVCTElDIEtFWS0tLS0tCk1JR2dNU2d3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktvd2dnU2lBZ0VBQW9JQkFRQ3drTG5EOHEKNnpzSk1idUVZd2swcmNVdmtBaFFyR3ViQklHeHRkN3dQQy9JTGNoNGRJeXFFb1VxYlhPMFBBeVhkNHJsMTJpUwpzbnh1VWFQNFRwNE5IQ3A0b0pYMGVEM0x1dGJNcGpLaTBkQlU4TWZVOVZ2TkNiMG5tNHhzRHpSRllhZm5zQlNaCmdRVVZPQnU2N25PeVFrdmxQejlMae50RWtqME55aWJ6R0loMndZTFZLbEJ1UG5zVnZiTlRZTldoazFnaGgKZzAybGpTVFN2SHo3eUtOZnBYZ3ZRQ2Z4RDZHWnYxVURoMHVaRjJHTlVIUEhUdDgybXovRkhtSng5T2NYZHo2cwpjWEM5WGdDOEhrY0IzVlJid1dYZ1A0bHNGZmNYQ3dtR0Zja1hRd0t6ZTAxVjVzUTQ4MlhnWmdtSUFsaHFhYWlBCnoyMUw5NDAxK1NkdHpUMnBMcElhNzJZWTdZMmR6cDlYZzVPVnE2UXpwdTVORWxISGh2MVNseWFqNFM5WTUxOHMKM2RxV0NBd0VBQWFOQ01BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQnZwZXZ4Si9PZm5YTVFaMlQyYmptL2t6ZAp6UDVmZU9YSXZQUGd6T3gxVjAwR0ptWmJMcE14T2I5Y1pEZzFsSmdxOEJic1VESWRaTWkzOWwxK2RyL3BZdWRMCnZRdmJxdzRTdkFsMXZnRjYxd3F4NDlMcGJGN0NZUkF6T0RZcXJMSnlKRmwwb25aZUUzSE5DMmNGZU1UeFJydmsKTVlsTFdIYytTT1I0dlpFTkMvSlZUdFhYNERxQ3dFQUFrb3V6VnVJSk5jTE5UKzY5TkpXWTdTZHF6Y3RzZXc5Rwp1VEhpclFxY2k5c1ltenlOdlE2VDZoYW1td0lkR2RrcmZzR1VUQWk2NzJDa3NLSGJuRFRlMUFSelZEMTFsSHVNCk9GOHZFVFhFcXhqTTBMUUFJREFRQUJvNEdkbUdCRUVHd0lHdUhCMG9HQ0NzR0FRVUZCd01DTUE4R0ExVUVCeE1LCk1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVVDV3dLSCtaSm82dnA1bTR5ZC9USUdLNkkrU2gKR0t2WmxVMEVjZG9PXC9seTlRMDB2L2x0a0RhclJCeS9CT0V6QmdyR29hZWhqSklzcllwbno1bElXQ2RPZAouLS0tLUVORCBQR1AgUFVCTElDIEtFWS0tLS0tCg==
+  - path: /etc/apt/sources.list.d/kubernetes.list
+    content: |
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main
+  - path: /etc/containerd/config.toml
+    content: |
+      version = 2
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+          SystemdCgroup = true
+  - path: /etc/systemd/system/openconnect.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=OpenConnect VPN client
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      Environment=VPN_HEADEND=${vpn_headend}
+      Environment=VPN_USER=${vpn_user}
+      EnvironmentFile=/etc/openconnect/secret.env
+      ExecStart=/usr/sbin/openconnect --user ${vpn_user} --passwd-on-stdin --script /etc/vpnc/vpnc-script ${vpn_headend}
+      ExecStartPost=/bin/sleep 2
+      Restart=always
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/openconnect/secret.env
+    permissions: "0600"
+    content: |
+      VPN_PASS=CHANGE_ME
+  - path: /etc/systemd/system/kubelet.service.d/10-openconnect.conf
+    permissions: "0644"
+    content: |
+      [Unit]
+      After=openconnect.service
+      Requires=openconnect.service
+runcmd:
+  - sysctl --system
+  - modprobe overlay
+  - modprobe br_netfilter
+  - swapoff -a
+  - systemctl restart containerd
+  - systemctl daemon-reload
+  - systemctl enable --now openconnect
+  - curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  - apt-get update
+  - apt-get install -y kubelet kubeadm kubectl
+  - apt-mark hold kubelet kubeadm kubectl
+
+# kubeadm join will be executed via Ansible

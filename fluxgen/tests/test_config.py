@@ -138,6 +138,7 @@ class TestBuildRuntimeConfig:
         assert cfg.dst == "10.0.0.1"
         assert cfg.clients == 1
         assert cfg.proto == "tcp"
+        assert cfg.ip_version == 4
 
     def test_missing_interface(self):
         """Test building config without interface raises error."""
@@ -239,6 +240,48 @@ class TestBuildRuntimeConfig:
         assert cfg.dry_run is True
         assert cfg.verbose is True
         assert cfg.quiet is True
+        assert cfg.ip_version == 4
+
+    def test_data_size_and_fragmentation_validation(self):
+        """Test validation of data_size and frag_mode."""
+        data = {"interface": "eth0", "dst": "10.0.0.1", "data_size": 128}
+        cfg = build_runtime_config(data)
+        assert cfg.data_size == 128
+
+        for bad_size in (-1, 0):
+            data_negative = {"interface": "eth0", "dst": "10.0.0.1", "data_size": bad_size}
+            with pytest.raises(ValueError, match="data_size"):
+                build_runtime_config(data_negative)
+
+        data_conflict = {"interface": "eth0", "dst": "10.0.0.1", "payload": "a", "data_size": 10}
+        with pytest.raises(ValueError, match="payload or data_size"):
+            build_runtime_config(data_conflict)
+
+        data_frag_mode = {"interface": "eth0", "dst": "10.0.0.1", "frag_mode": "random"}
+        cfg = build_runtime_config(data_frag_mode)
+        assert cfg.frag_mode == "random"
+
+        data_bad_frag_mode = {"interface": "eth0", "dst": "10.0.0.1", "frag_mode": "weird"}
+        with pytest.raises(ValueError, match="frag_mode"):
+            build_runtime_config(data_bad_frag_mode)
+
+    def test_ip_version_resolution(self):
+        """Test ip_version detection and overrides."""
+        data_v6 = {"interface": "eth0", "dst": "2001:db8::1"}
+        cfg = build_runtime_config(data_v6)
+        assert cfg.ip_version == 6
+
+        data_force_v4 = {"interface": "eth0", "dst": "10.0.0.1", "ip_version": "4"}
+        cfg = build_runtime_config(data_force_v4)
+        assert cfg.ip_version == 4
+
+        data_mismatch = {"interface": "eth0", "dst": "2001:db8::1", "ip_version": 4}
+        with pytest.raises(ValueError, match="ip_version"):
+            build_runtime_config(data_mismatch)
+
+        data_auto_default = {"interface": "eth0", "dst": "example.com"}
+        cfg = build_runtime_config(data_auto_default)
+        assert cfg.ip_version == 4
 
 
 class TestConfigEdgeCases:
@@ -266,4 +309,3 @@ class TestConfigEdgeCases:
         assert _maybe_int("not a number") is None
         assert _maybe_int([1, 2, 3]) is None
         assert _maybe_int({"key": "value"}) is None
-
