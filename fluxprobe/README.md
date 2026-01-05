@@ -154,6 +154,9 @@ python3 -m fluxprobe --protocol modbus --target plc:502 --delay-ms 100 --iterati
 # Wait for and log responses
 python3 -m fluxprobe --protocol echo --target echo-server:7 --recv-timeout 2.0 --log-file responses.log
 
+# Build and log frames without sending (dry-run)
+python3 -m fluxprobe --protocol http --target webapp:80 --iterations 5 --dry-run --log-level DEBUG
+
 # Adjust logging verbosity
 python3 -m fluxprobe --protocol http --target webapp:80 --log-level DEBUG --iterations 50
 ```

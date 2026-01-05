@@ -1,17 +1,12 @@
+from typing import Optional
 import sys
-from types import SimpleNamespace
-from pathlib import Path
-import random
 
 import pytest
 
 from fluxprobe import cli
-from typing import Optional
-
+from fluxprobe import runner as runner_mod
 from fluxprobe.runner import FuzzRunner, FuzzConfig
 from fluxprobe.schema import protocol_from_dict
-from fluxprobe import transport as transport_mod
-from fluxprobe import runner as runner_mod
 
 
 class FakeTransport:
@@ -57,6 +52,31 @@ def test_runner_uses_transport_and_logs(tmp_path, monkeypatch):
     assert fake_transport.sent  # data was sent
     assert fake_transport.closed
     assert log_file.exists()
+
+
+def test_runner_dry_run_skips_transport_and_logs(tmp_path, monkeypatch):
+    schema = protocol_from_dict(
+        {
+            "name": "Echo",
+            "transport": {"type": "tcp", "host": "127.0.0.1", "port": 1},
+            "message": {
+                "fields": [
+                    {"name": "opcode", "type": "u8", "default": 1},
+                ]
+            },
+        }
+    )
+
+    def fail_transport(_):
+        raise AssertionError("transport should not be created in dry-run mode")
+
+    monkeypatch.setattr(runner_mod, "create_transport", fail_transport)
+    log_file = tmp_path / "dry.log"
+    runner = FuzzRunner(schema, FuzzConfig(iterations=2, mutation_rate=0.0, dry_run=True, log_file=log_file, seed=1))
+    runner.run()
+    contents = log_file.read_text()
+    assert "dry_run=True" in contents
+    assert "DRY-RUN" in contents
 
 
 def test_cli_protocol_and_target(monkeypatch):
@@ -160,3 +180,24 @@ def test_cli_target_ipv6(monkeypatch):
     monkeypatch.setattr(sys, "argv", argv)
     cli.main()
     assert captured == {"host": "::1", "port": 443}
+
+
+def test_cli_sets_dry_run(monkeypatch):
+    captured = {}
+    minimal_schema = protocol_from_dict(
+        {
+            "name": "Mini",
+            "transport": {"type": "tcp", "host": "1.1.1.1", "port": 80},
+            "message": {"fields": [{"name": "b", "type": "u8", "default": 1}]},
+        }
+    )
+    monkeypatch.setattr(cli, "load_profile", lambda name: minimal_schema)
+    monkeypatch.setattr(
+        cli.FuzzRunner,
+        "run",
+        lambda self: captured.update({"dry_run": self.config.dry_run, "host": self.schema.transport.host}),
+    )
+    argv = ["prog", "--protocol", "echo", "--target", "1.1.1.1:80", "--iterations", "1", "--dry-run"]
+    monkeypatch.setattr(sys, "argv", argv)
+    cli.main()
+    assert captured == {"dry_run": True, "host": "1.1.1.1"}

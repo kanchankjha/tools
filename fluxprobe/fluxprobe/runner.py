@@ -8,7 +8,7 @@ from typing import Optional
 from .generator import generate_valid_message
 from .mutator import Mutator
 from .schema import ProtocolSchema
-from .transport import create_transport
+from .transport import Transport, create_transport
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ class FuzzConfig:
     seed: Optional[int] = None
     delay_ms: int = 0
     log_file: Optional[Path] = None
+    dry_run: bool = False
 
 
 class FuzzRunner:
@@ -50,10 +51,13 @@ class FuzzRunner:
             self._log_fp.flush()
 
     def run(self) -> None:
-        transport = create_transport(self.schema.transport)
+        transport: Optional[Transport] = None
+        if not self.config.dry_run:
+            transport = create_transport(self.schema.transport)
         self._log_line(f"Starting fuzz run against {self.schema.transport.host}:{self.schema.transport.port} "
                        f"({self.schema.transport.type}), iterations={self.config.iterations}, "
-                       f"mutation_rate={self.config.mutation_rate}, seed={self.config.seed}")
+                       f"mutation_rate={self.config.mutation_rate}, seed={self.config.seed}, "
+                       f"dry_run={self.config.dry_run}")
         try:
             for idx in range(1, self.config.iterations + 1):
                 msg = generate_valid_message(self.schema, self.rng)
@@ -63,18 +67,25 @@ class FuzzRunner:
                     payload = self.mutator.mutate(msg, self.rng, operations=self.config.mutations_per_frame)
                     mutated = True
 
-                transport.send(payload)
-                response = b""
-                if self.config.recv_timeout and self.config.recv_timeout > 0:
-                    response = transport.recv(timeout=self.config.recv_timeout)
-                self._log_line(
-                    f"[{idx}] {'M' if mutated else 'V'} sent={len(payload)}B { _hexdump(payload) } "
-                    f"resp={len(response)}B { _hexdump(response) if response else ''}"
-                )
+                if self.config.dry_run:
+                    self._log_line(
+                        f"[{idx}] {'M' if mutated else 'V'} DRY-RUN sent={len(payload)}B { _hexdump(payload) }"
+                    )
+                else:
+                    assert transport is not None
+                    transport.send(payload)
+                    response = b""
+                    if self.config.recv_timeout and self.config.recv_timeout > 0:
+                        response = transport.recv(timeout=self.config.recv_timeout)
+                    self._log_line(
+                        f"[{idx}] {'M' if mutated else 'V'} sent={len(payload)}B { _hexdump(payload) } "
+                        f"resp={len(response)}B { _hexdump(response) if response else ''}"
+                    )
                 if self.config.delay_ms:
                     time.sleep(self.config.delay_ms / 1000.0)
         finally:
-            transport.close()
+            if transport:
+                transport.close()
             if self._log_fp:
                 self._log_fp.close()
                 self._log_fp = None

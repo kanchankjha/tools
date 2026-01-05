@@ -6,8 +6,8 @@ A collection of network testing, automation, and infrastructure tools for QA, se
 
 ### 🔌 Network & VPN Tools
 
-#### [AnyConnect](anyconnect/)
-Provisions Linux network namespaces backed by veth pairs with isolated Cisco AnyConnect/OpenConnect tunnels. Each namespace targets a different VPN concentrator while keeping routes and DNS separated. Perfect for testing concurrent VPN sessions.
+#### [ManyConnect](manyconnect/)
+Simulates many Cisco AnyConnect/OpenConnect clients from a single host by provisioning Linux network namespaces backed by veth pairs. Each namespace targets a different VPN concentrator while keeping routes and DNS separated. Perfect for testing concurrent VPN sessions.
 
 **Use cases:** Multi-tunnel testing, VPN load testing, isolated network testing
 
@@ -70,7 +70,7 @@ Each tool has its own README with detailed installation and usage instructions. 
 
 ```
 tools/
-├── anyconnect/           # VPN namespace automation
+├── manyconnect/          # Multi-client AnyConnect namespace automation
 ├── command-repeater/     # Incremental command executor
 ├── fluxgen/             # Multi-client traffic generator
 ├── fluxprobe/           # Protocol fuzzer

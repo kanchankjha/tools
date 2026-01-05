@@ -19,6 +19,8 @@ Requires-Dist: netifaces>=0.11; extra == "extras"
 
 **fluxgen** is a powerful multi-client traffic generator inspired by hping3. It simulates many clients on a single Linux host, sending customizable network traffic with spoofed IP/MAC addresses from the same subnet. Perfect for network testing, load testing, and security research.
 
+> **Companion Tool:** Check out [FluxProbe](../fluxprobe) - a schema-driven protocol fuzzer for security testing and vulnerability discovery.
+
 ## Features
 
 - **Multi-client simulation** - Simulate hundreds of clients from a single host
@@ -57,9 +59,10 @@ cd tools/fluxgen
 python3 -m venv .venv
 
 # Activate the virtual environment
-source .venv/bin/activate  # On Linux/macOS
-# Or on Windows: .venv\Scripts\activate
+source .venv/bin/activate
 ```
+
+**Note:** fluxgen requires Linux for raw socket support. macOS and Windows are not supported for packet sending.
 
 ### Step 3: Install Dependencies
 
@@ -220,6 +223,12 @@ fluxgen --interface eth0 --clients 5 --dst 10.0.0.5 --dport 8080 --proto tcp --p
 
 # Hex payload
 fluxgen --interface eth0 --clients 5 --dst 10.0.0.5 --dport 8080 --proto udp --payload "deadbeef" --payload-hex --count 10
+
+# Auto-generated payload of specific size
+fluxgen --interface eth0 --clients 2 --dst 10.0.0.5 --dport 53 --proto udp --data-size 512 --count 5
+
+# IPv6 example (auto-detects family)
+fluxgen --interface eth0 --clients 3 --dst 2001:db8::50 --dport 443 --proto tcp --ip-version auto --count 20
 ```
 
 ### 6. PCAP Capture
@@ -262,7 +271,9 @@ Key flags:
 - `--subnet-pool` CIDR to allocate client IPs (defaults to interface subnet)
 - `--rand-source` randomize client identity per packet
 - `--rand-dest --dest-subnet 10.0.0.0/24` randomize destination IPs
-- `--payload "deadbeef" --payload-hex` send custom payload
+- `--payload "deadbeef" --payload-hex` send custom payload, or `--data-size 1024` to auto-fill a payload
+- `--frag --frag-size 500 --frag-mode random` enable fragmentation with fixed or randomized fragment sizes
+- `--ip-version 4|6|auto` force IPv4/IPv6 or let fluxgen infer from destinations
 - `--flood` remove delay, `--dry-run` craft packets only, `--pcap-out out.pcap` write sent frames
 
 ### Common Use Cases
@@ -786,6 +797,4 @@ pip install -e .
 ## License
 
 This project is provided as-is for educational and testing purposes. Ensure you have proper authorization before using fluxgen on any network.
-
-
 

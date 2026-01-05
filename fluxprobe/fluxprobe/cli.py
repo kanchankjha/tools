@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--recv-timeout", type=float, default=0.0, help="Seconds to wait for responses (0 to skip)")
     parser.add_argument("--seed", type=int, help="RNG seed for reproducibility")
     parser.add_argument("--delay-ms", type=int, default=0, help="Delay between sends in milliseconds")
+    parser.add_argument("--dry-run", action="store_true", help="Build frames and log without sending")
     parser.add_argument("--log-file", type=Path, help="Optional log file path")
     parser.add_argument("--log-level", default="INFO", help="Logging level (DEBUG, INFO, WARNING)")
     return parser.parse_args()
@@ -77,6 +78,7 @@ def main() -> None:
         seed=args.seed,
         delay_ms=args.delay_ms,
         log_file=args.log_file,
+        dry_run=args.dry_run,
     )
     runner = FuzzRunner(schema, config)
     runner.run()

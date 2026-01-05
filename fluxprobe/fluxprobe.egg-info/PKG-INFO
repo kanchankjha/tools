@@ -6,6 +6,10 @@ Author-email: Kanchan Kumar Jha <kanchankjha@gmail.com>
 Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 Requires-Dist: PyYAML>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: pytest-mock>=3.10; extra == "dev"
 
 # FluxProbe
 
@@ -126,6 +130,9 @@ python3 -m fluxprobe --protocol mqtt --target localhost:1883 --iterations 500 --
 
 # Fuzz Modbus/TCP device
 python3 -m fluxprobe --protocol modbus --target 10.0.0.5:502 --iterations 300 --mutation-rate 0.5
+
+# IPv6 target example
+python3 -m fluxprobe --protocol http --target "[2001:db8::50]":80 --iterations 50
 ```
 
 **Available built-in profiles:** `echo`, `http`, `dns`, `mqtt`, `modbus`, `coap`, `tcp`, `udp`, `ip`, `snmp`, `ssh`
